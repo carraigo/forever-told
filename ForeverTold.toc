@@ -1,0 +1,23 @@
+## Interface: 16001, 11509
+## Title: Forever Told
+## Notes: Your story, forever told. A journal of your journey to 60: first visits, level-ups, bosses, quests, loot, friends, deeds and chapter recaps, plus grudges, wanted posters and a guild bounty board for sweet revenge. Type /told or click the book on your minimap.
+## Author: SMUGDUCK
+## Version: 0.8.2
+## IconTexture: Interface\Icons\INV_Misc_Book_09
+## AddonCompartmentFunc: ForeverTold_OnAddonCompartmentClick
+## SavedVariablesPerCharacter: ForeverToldDB, ForeverSagaDB
+
+Data.lua
+Util.lua
+Core.lua
+Fellowship.lua
+Recap.lua
+Deeds.lua
+Grudges.lua
+Bounty.lua
+Skin.lua
+Wanted.lua
+Pages.lua
+UI.lua
+Popups.lua
+Minimap.lua
