@@ -125,6 +125,7 @@ local function OnDeath()
     end
     local a = killer and attackers[killer]
     attackers = {}
+    ns.lastKiller = killer -- for the Hardcore epitaph
     if not killer then return end
 
     local g = DB.grudges[killer]

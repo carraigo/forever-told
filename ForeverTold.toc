@@ -2,7 +2,7 @@
 ## Title: Forever Told
 ## Notes: Your story, forever told. A journal of your journey to 60: first visits, level-ups, bosses, quests, loot, friends, deeds and chapter recaps, plus grudges, wanted posters and a guild bounty board for sweet revenge. Type /told or click the book on your minimap.
 ## Author: SMUGDUCK
-## Version: 0.8.3
+## Version: 0.9
 ## IconTexture: Interface\Icons\INV_Misc_Book_09
 ## AddonCompartmentFunc: ForeverTold_OnAddonCompartmentClick
 ## SavedVariablesPerCharacter: ForeverToldDB, ForeverSagaDB
@@ -17,7 +17,16 @@ Grudges.lua
 Bounty.lua
 Skin.lua
 Wanted.lua
-Pages.lua
+Transfer.lua
+Epitaph.lua
+Pages\Pages.lua
+Pages\Journal.lua
+Pages\Fellowship.lua
+Pages\Deeds.lua
+Pages\Grudges.lua
+Pages\Atlas.lua
+Pages\Stats.lua
+Pages\Settings.lua
 UI.lua
 Popups.lua
 Minimap.lua
