@@ -7,10 +7,10 @@ local _, ns = ...
 
 local PAGES = {}
 ns.Pages = PAGES
-ns.PAGE_ORDER = { "journal", "fellowship", "deeds", "grudges", "atlas", "stats", "settings" }
+ns.PAGE_ORDER = { "journal", "fellowship", "deeds", "grudges", "chronicle", "atlas", "stats", "settings" }
 -- Extra slash names that open a page on a particular view.
 ns.PAGE_ALIASES = { bounties = { "grudges", "bounties" }, bounty = { "grudges", "bounties" }, rivals = { "grudges", "rivals" },
-    wanted = { "grudges", "wall" }, posters = { "grudges", "wall" } }
+    wanted = { "grudges", "wall" }, posters = { "grudges", "wall" }, guild = { "chronicle" } }
 
 function ns.HasPage(name) return PAGES[name] ~= nil or ns.PAGE_ALIASES[name] ~= nil end
 

@@ -4,10 +4,10 @@
 --
 --   /told                 open the journal (or click the minimap button)
 --   /told <page>          open a page: journal, fellowship, deeds, grudges,
---                         bounties, rivals, atlas, stats, settings
+--                         bounties, rivals, chronicle, atlas, stats, settings
 --   /told note <text>     add your own line to the journal
 --   /told recent          print the last ten entries to chat
---   /told shots|banner|minimap|time|alerts|bounty|rare   flip a setting
+--   /told shots|banner|minimap|time|alerts|bounty|milestones|rare   flip a setting
 --   /told export|import   back up your story, or bring one back
 --   /told epitaph         the Hardcore memorial stone (or how it would read)
 
@@ -29,6 +29,20 @@ function ns.On(event, fn)
     table.insert(ns.listeners[event], fn)
 end
 
+-- Milestones other modules care about (level, loot, boss, quest, deed,
+-- epitaph), so the journal, the atlas and the guild chronicle stay apart.
+local signals = {}
+function ns.Listen(name, fn)
+    signals[name] = signals[name] or {}
+    table.insert(signals[name], fn)
+end
+function ns.Emit(name, ...)
+    for _, fn in ipairs(signals[name] or {}) do
+        local ok, err = pcall(fn, ...)
+        if not ok and geterrorhandler then geterrorhandler()(err) end
+    end
+end
+
 -- Per-chapter tallies for the chapter recap. Chapter 0 is levels 1-9.
 function ns.ChapterOf(level) return math.min(6, math.floor((level or 1) / 10)) end
 function ns.Bump(field, amount)
@@ -48,7 +62,7 @@ function ns.Zone()
 end
 local Zone = ns.Zone
 
--- Walk up the map tree to find the continent the player is on.
+-- Walk up the map tree to find the continent the player is on: its name and map ID.
 local function Continent()
     if not (C_Map and C_Map.GetBestMapForUnit) then return nil end
     local mapID = C_Map.GetBestMapForUnit("player")
@@ -57,7 +71,7 @@ local function Continent()
         if not mapID then return nil end
         local info = C_Map.GetMapInfo(mapID)
         if not info then return nil end
-        if info.mapType == continentType then return info.name end
+        if info.mapType == continentType then return info.name, mapID end
         mapID = info.parentMapID
     end
 end
@@ -99,9 +113,11 @@ local handlers = {}
 local function CheckZone()
     local DB = ns.DB
     local zone = Zone()
+    local continent, continentID = Continent()
+    if continentID then DB.continents[continentID] = continent end
     if DB.zones[zone] then return end
     local inInstance = IsInInstance()
-    DB.zones[zone] = { t = time(), lvl = UnitLevel("player"), continent = Continent(), instance = inInstance and true or nil }
+    DB.zones[zone] = { t = time(), lvl = UnitLevel("player"), continent = continent, instance = inInstance and true or nil }
     if inInstance then
         Bump("dungeons")
         Add("dungeon", Pick(ns.FLAVOUR.dungeon):format(zone))
@@ -141,6 +157,7 @@ handlers.PLAYER_LEVEL_UP = function(level)
     end
     -- A new chapter: close the old one with a recap first.
     if level % 10 == 0 and ns.WriteRecap then ns.WriteRecap(ns.ChapterOf(level - 1), level - 1) end
+    ns.Emit("level", level)
     Add("level", Pick(ns.FLAVOUR.level):format(level, Zone()), level)
     if ns.MILESTONE_LEVELS[level] then Add("level", ns.MILESTONE_LEVELS[level], level) end
     if ns.ShowBanner and DB.banner then ns.ShowBanner(level) end
@@ -157,6 +174,7 @@ handlers.QUEST_TURNED_IN = function(questID)
     local DB = ns.DB
     DB.quests = DB.quests + 1
     Bump("quests")
+    ns.Emit("quest", questID)
     local title
     if C_QuestLog and C_QuestLog.GetTitleForQuestID then
         title = C_QuestLog.GetTitleForQuestID(questID)
@@ -203,6 +221,7 @@ local function BossKilled(id, name)
     if lastKill[id] and GetTime() - lastKill[id] < 10 then return end
     lastKill[id] = GetTime()
     if ns.OnBossKill then ns.OnBossKill(id, name) end
+    ns.Emit("boss", id, name, not DB.bosses[id])
     if DB.bosses[id] then return end
     DB.bosses[id] = { t = time(), name = name, zone = Zone() }
     Bump("bosses")
@@ -238,6 +257,7 @@ handlers.CHAT_MSG_LOOT = function(msg)
     local link = (LOOT_SELF_MULTI and msg:match(LOOT_SELF_MULTI)) or (LOOT_SELF and msg:match(LOOT_SELF))
     if not link then return end
     local quality = ItemQuality(link)
+    if quality then ns.Emit("loot", link, quality) end
     if quality and quality >= DB.lootQuality then
         DB.epics = DB.epics + 1
         Bump("loot")
@@ -260,7 +280,8 @@ end
 -- Saved data -------------------------------------------------------------------------
 
 local TABLES = { "entries", "zones", "goldMarks", "bosses", "skills", "levelTimes", "deathZones", "fellows",
-    "deeds", "counters", "recaps", "grudges", "bounties", "gankHours", "window", "posters", "debts" }
+    "deeds", "counters", "recaps", "grudges", "bounties", "gankHours", "window", "posters", "debts",
+    "foes", "zoneStats", "continents", "chronicle", "chronicled" }
 local VALUES = { quests = 0, deaths = 0, shots = 0, epics = 0, goldPeak = 0, lootQuality = 4 }
 
 -- Upgrades to saved data. DB.version counts how many have run, so each one
@@ -310,6 +331,12 @@ local MIGRATIONS = {
     -- 4. Version 0.9: bounties remember when they first went up, for poster wear.
     function(DB)
         for _, b in pairs(DB.bounties) do b.since = b.since or b.t end
+    end,
+    -- 5. Version 1.0: dungeons run before the guild chronicle aren't news any more.
+    function(DB)
+        for zone, info in pairs(DB.zones) do
+            if info.instance then DB.chronicled[zone] = true end
+        end
     end,
 }
 
@@ -370,6 +397,8 @@ ns.SETTINGS = {
     { section = "PvP" },
     { key = "grudgeAlerts", default = true, slash = "alerts", label = "Warn me when a nemesis or guild bounty is nearby", chat = "Nearby warnings" },
     { key = "shareBounties", default = true, slash = "bounty", label = "Post my grudges on my guild's bounty board", chat = "Bounty board sharing" },
+    { section = "Guild" },
+    { key = "shareChronicle", default = true, slash = "milestones", label = "Share my milestones in the guild chronicle", chat = "Guild chronicle sharing" },
     { section = "Interface" },
     { slash = "minimap", label = "Show the minimap button", chat = "Minimap button",
       get = function() return not ns.DB.minimap.hidden end,

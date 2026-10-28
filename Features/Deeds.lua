@@ -140,6 +140,7 @@ function ns.CheckDeeds(silent)
                 if not silent then
                     ns.Bump("deeds")
                     ns.Add("deed", ("Deed earned: %s. %s"):format(deed[2], deed[3]))
+                    ns.Emit("deed", deed[2], deed[3])
                     if ns.ShowToast then ns.ShowToast("Deed earned", deed[2], deed[3]) end
                 end
             end
