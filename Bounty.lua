@@ -223,7 +223,7 @@ local function OnMessage(prefix, msg, channel, sender)
     if kind == "H" then
         C_Timer.After(1 + math.random() * 4, SendAll)
     elseif kind == "P" and name and name ~= "" then
-        local b = DB.bounties[name] or { posters = {} }
+        local b = DB.bounties[name] or { posters = {}, since = time() }
         DB.bounties[name] = b
         b.posters[sender] = { kills = tonumber(f[3]) or 1, ours = tonumber(f[4]) or 0, t = time() }
         b.classFile = f[5] ~= "" and f[5] or b.classFile

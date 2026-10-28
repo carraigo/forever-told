@@ -42,23 +42,123 @@ local function ListNames(names)
 end
 
 -- Brown edges that fade towards the middle, so the paper looks aged.
-local function Age(frame, depth)
+local function Age(frame, depth, strength)
+    strength = strength or 0.45
+    local edges = {}
     local function Edge(p1, p2, horizontal, flip)
         local t = frame:CreateTexture(nil, "BORDER")
+        edges[#edges + 1] = t
         t:SetColorTexture(1, 1, 1, 1)
         t:SetPoint(p1)
         t:SetPoint(p2)
         if horizontal then t:SetHeight(depth) else t:SetWidth(depth) end
-        local dark, clear = { 0.45, 0.28, 0.10, 0.45 }, { 0.45, 0.28, 0.10, 0 }
+        local dark, clear = { 0.45, 0.28, 0.10, strength }, { 0.45, 0.28, 0.10, 0 }
         if flip then dark, clear = clear, dark end
         local ok = t.SetGradient and CreateColor and pcall(t.SetGradient, t, horizontal and "VERTICAL" or "HORIZONTAL",
             CreateColor(unpack(dark)), CreateColor(unpack(clear)))
-        if not ok then t:SetColorTexture(0.45, 0.28, 0.10, 0.12) end
+        if not ok then t:SetColorTexture(0.45, 0.28, 0.10, strength / 4) end
     end
     Edge("BOTTOMLEFT", "BOTTOMRIGHT", true, false)
     Edge("TOPLEFT", "TOPRIGHT", true, true)
     Edge("TOPLEFT", "BOTTOMLEFT", false, false)
     Edge("TOPRIGHT", "BOTTOMRIGHT", false, true)
+    return edges
+end
+
+-- Poster wear ---------------------------------------------------------------------------
+-- A poster yellows and picks up stains the longer it hangs: fresh for its
+-- first week, worn up to three weeks, weathered after that, with darker
+-- edges, a torn pin hole and a curled corner.
+
+local WEEK = 7 * 86400
+local ROUND = "Interface\\CHARACTERFRAME\\TempPortraitAlphaMask"
+
+local function WearStage(since)
+    if not since then return 0 end
+    local age = time() - since
+    if age < WEEK then return 0 end
+    if age < 3 * WEEK then return 1 end
+    return 2
+end
+ns.WearStage = WearStage
+
+local function Blot(frame, layer, sublevel)
+    local t = frame:CreateTexture(nil, layer, nil, sublevel)
+    t:SetTexture(ROUND)
+    return t
+end
+
+-- Builds the wear layers on a sheet of paper (hidden until SetWear).
+-- size scales the details: 1 for the big poster, smaller for the wall.
+local function AddWear(frame, size)
+    local w = { size = size }
+    w.tint = frame:CreateTexture(nil, "BORDER", nil, 1)
+    w.tint:SetAllPoints()
+    w.edges = Age(frame, 70 * size, 0.55)
+    w.stains = {}
+    for i = 1, 3 do
+        w.stains[i] = Blot(frame, "BORDER", 2)
+        w.stains[i]:SetVertexColor(0.45, 0.28, 0.10, 0.16)
+    end
+    -- The pin hole and a small tear running down from it.
+    w.hole = Blot(frame, "OVERLAY", 1)
+    w.hole:SetVertexColor(0.16, 0.10, 0.05, 0.85)
+    w.hole:SetSize(7 * size + 2, 7 * size + 2)
+    w.hole:SetPoint("TOP", 0, -8 * size)
+    w.tear = frame:CreateTexture(nil, "OVERLAY", nil, 1)
+    w.tear:SetColorTexture(0.16, 0.10, 0.05, 0.6)
+    w.tear:SetSize(1, 14 * size)
+    w.tear:SetPoint("TOP", w.hole, "BOTTOM", 2, 1)
+    if w.tear.SetRotation then w.tear:SetRotation(math.rad(-14)) end
+    -- A dog-eared bottom-right corner: a square turned 45 degrees, clipped
+    -- by the paper so only a triangle shows.
+    if frame.SetClipsChildren then
+        local clip = CreateFrame("Frame", nil, frame)
+        clip:SetAllPoints()
+        clip:SetClipsChildren(true)
+        clip:SetFrameLevel(frame:GetFrameLevel() + 2)
+        local fold = clip:CreateTexture(nil, "OVERLAY")
+        fold:SetColorTexture(0.74, 0.63, 0.45, 1)
+        fold:SetSize(44 * size, 44 * size)
+        fold:SetPoint("CENTER", clip, "BOTTOMRIGHT", 0, 0)
+        if fold.SetRotation then fold:SetRotation(math.rad(45)) end
+        local shade = clip:CreateTexture(nil, "ARTWORK")
+        shade:SetColorTexture(0.30, 0.18, 0.07, 0.35)
+        shade:SetSize(50 * size, 50 * size)
+        shade:SetPoint("CENTER", clip, "BOTTOMRIGHT", 0, 0)
+        if shade.SetRotation then shade:SetRotation(math.rad(45)) end
+        w.curl = clip
+    end
+    frame.wear = w
+    return w
+end
+
+-- Show a stage (0 fresh, 1 worn, 2 weathered). seed keeps each poster's
+-- stains in the same places every time it's drawn.
+local function SetWear(frame, stage, seed)
+    local w = frame.wear
+    if not w then return end
+    w.stage = stage
+    w.tint:SetColorTexture(0.55, 0.38, 0.12, stage == 2 and 0.24 or stage == 1 and 0.13 or 0)
+    for _, t in ipairs(w.edges) do t:SetShown(stage == 2) end
+    local width, height = frame:GetWidth() or 300, frame:GetHeight() or 400
+    local n = 0
+    for i = 1, #(seed or "") do n = (n * 31 + seed:byte(i)) % 100003 end
+    for i, t in ipairs(w.stains) do
+        local show = (stage == 1 and i == 1) or stage == 2
+        t:SetShown(show)
+        if show then
+            n = (n * 7919 + 104729) % 100003
+            local d = (36 + n % 40) * w.size + 8
+            t:SetSize(d, d)
+            t:ClearAllPoints()
+            t:SetPoint("CENTER", frame, "BOTTOMLEFT", 20 + n % math.max(1, math.floor(width - 40)),
+                20 + math.floor(n / 7) % math.max(1, math.floor(height - 40)))
+        end
+    end
+    w.hole:SetShown(stage == 2)
+    w.tear:SetShown(stage == 2)
+    if w.curl then w.curl:SetShown(stage == 2) end
 end
 
 local function Paper(frame, inset)
@@ -116,6 +216,10 @@ local function PosterInfo(name)
         info.victims[#info.victims + 1] = UnitName("player")
         info.kills = g.kills
     end
+    -- How long they've been wanted, for the poster's wear.
+    info.since = g and g.first
+    local posted = b and (b.since or b.t)
+    if posted and (not info.since or posted < info.since) then info.since = posted end
     if b then
         for poster, p in pairs(b.posters) do
             info.victims[#info.victims + 1] = Short(poster)
@@ -144,6 +248,7 @@ end
 local function FillPoster(info, reward)
     local p = poster
     p.tagline:SetText(Tagline(info.name))
+    SetWear(p, info.settled and 0 or WearStage(info.since), info.name)
     ClassIcon(p.portrait, info.classFile)
     p.caption:SetText(info.class and ("a %s"):format(info.class:lower()) or "a stranger")
     p.who:SetText(Short(info.name):upper())
@@ -205,36 +310,8 @@ local function TakeDown()
     ns.Refresh()
 end
 
--- Hide the interface for a moment so the screenshot is just the poster.
 local function Share()
-    if InCombatLockdown() then
-        ns.Print("Wait until you're out of combat to take the poster's picture.")
-        return
-    end
-    local p = poster
-    local scale = p:GetEffectiveScale() / WorldFrame:GetEffectiveScale()
-    p.controls:Hide()
-    p.close:Hide()
-    p:SetParent(WorldFrame)
-    p:SetScale(scale)
-    p:ClearAllPoints()
-    p:SetPoint("CENTER")
-    p:SetFrameStrata("FULLSCREEN_DIALOG")
-    UIParent:Hide()
-    C_Timer.After(0.2, function()
-        Screenshot()
-        C_Timer.After(0.6, function()
-            UIParent:Show()
-            p:SetParent(UIParent)
-            p:SetScale(1)
-            p:ClearAllPoints()
-            p:SetPoint("CENTER", 0, 40)
-            p:SetFrameStrata("DIALOG")
-            p.controls:Show()
-            p.close:Show()
-            ns.Print("Poster saved to your Screenshots folder. Drop it in Discord!")
-        end)
-    end)
+    S.Snapshot(poster, { poster.controls, poster.close }, "Poster saved to your Screenshots folder. Drop it in Discord!")
 end
 
 local function CreatePoster()
@@ -252,6 +329,7 @@ local function CreatePoster()
     p:SetScript("OnDragStop", p.StopMovingOrSizing)
     tinsert(UISpecialFrames, "ForeverToldPoster")
     Paper(p, 12)
+    AddWear(p, 1)
 
     p.title = Ink(p, 52, { 0.29, 0.16, 0.07, 1 })
     p.title:SetPoint("TOP", 0, -28)
@@ -412,6 +490,7 @@ local function CreateMini(parent)
     local m = CreateFrame("Button", nil, parent)
     m:SetSize(CARD_W, CARD_H)
     Paper(m, 6)
+    AddWear(m, 0.4)
     m.title = Ink(m, 20, { 0.29, 0.16, 0.07, 1 })
     m.title:SetPoint("TOP", 0, -12)
     m.title:SetText("WANTED")
@@ -507,6 +586,7 @@ function ns.CreatePosterWall(parent)
             -- A slight up-and-down stagger so it looks pinned by hand.
             m:SetPoint("TOPLEFT", offset + col * (CARD_W + GAP), -(row * (CARD_H + GAP) + ((i % 3 == 0) and 8 or (i % 2) * 4)))
             ClassIcon(m.icon, info and info.classFile)
+            SetWear(m, WearStage(info and info.since), b.name)
             m.who:SetText(Short(b.name):upper())
             m.detail:SetText(("%s%s"):format(b.level and (b.level .. " ") or "", b.class or "") .. (b.zone and b.zone ~= "" and (" · " .. b.zone) or ""))
             m.reward:SetText(b.reward > 0 and ("%d GOLD"):format(b.reward) or "for glory")

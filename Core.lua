@@ -8,6 +8,8 @@
 --   /told note <text>     add your own line to the journal
 --   /told recent          print the last ten entries to chat
 --   /told shots|banner|minimap|time|alerts|bounty|rare   flip a setting
+--   /told export|import   back up your story, or bring one back
+--   /told epitaph         the Hardcore memorial stone (or how it would read)
 
 local ADDON, ns = ...
 local U = ns.U
@@ -261,6 +263,56 @@ local TABLES = { "entries", "zones", "goldMarks", "bosses", "skills", "levelTime
     "deeds", "counters", "recaps", "grudges", "bounties", "gankHours", "window", "posters", "debts" }
 local VALUES = { quests = 0, deaths = 0, shots = 0, epics = 0, goldPeak = 0, lootQuality = 4 }
 
+-- Upgrades to saved data. DB.version counts how many have run, so each one
+-- runs once per character. Add new ones to the end; never reorder them.
+local function IsTest(name) return type(name) == "string" and name:find("-Testrealm", 1, true) ~= nil end
+
+local MIGRATIONS = {
+    -- 1. Version 0.1 stored a bare timestamp per zone.
+    function(DB)
+        for zone, v in pairs(DB.zones) do
+            if type(v) == "number" then DB.zones[zone] = { t = v } end
+        end
+    end,
+    -- 2. Version 0.4 only kept each killer's latest zone; seed the rivalry map from that.
+    function(DB)
+        if DB.gankZones then return end
+        DB.gankZones = {}
+        for _, g in pairs(DB.grudges) do
+            local z = g.zone or "somewhere unknown"
+            DB.gankZones[z] = DB.gankZones[z] or { kills = 0, revenge = 0 }
+            DB.gankZones[z].kills = DB.gankZones[z].kills + g.kills
+        end
+    end,
+    -- 3. Version 0.8.3: test mode is gone, and grudges left the journal.
+    function(DB)
+        for i = #DB.entries, 1, -1 do
+            local e = DB.entries[i]
+            if e.test or OFF_JOURNAL[e.kind] or (e.kind == "note" and type(e.text) == "string" and e.text:find("^Paid .+ gold for taking down")) then
+                table.remove(DB.entries, i)
+            end
+        end
+        for _, key in ipairs({ "grudges", "bounties", "posters" }) do
+            for name in pairs(DB[key]) do if IsTest(name) then DB[key][name] = nil end end
+        end
+        for name, b in pairs(DB.bounties) do
+            for poster in pairs(b.posters or {}) do if IsTest(poster) then b.posters[poster] = nil end end
+            if not next(b.posters or {}) then DB.bounties[name] = nil end
+        end
+        for i = #DB.debts, 1, -1 do
+            if IsTest(DB.debts[i].name) or IsTest(DB.debts[i].to) then table.remove(DB.debts, i) end
+        end
+        if DB.testSnapshot then
+            for key, saved in pairs(DB.testSnapshot) do DB[key] = saved end
+            DB.testSnapshot = nil
+        end
+    end,
+    -- 4. Version 0.9: bounties remember when they first went up, for poster wear.
+    function(DB)
+        for _, b in pairs(DB.bounties) do b.since = b.since or b.t end
+    end,
+}
+
 local function InitDB()
     -- Adopt saved data from the addon's earlier name, once.
     if not ForeverToldDB and ForeverSagaDB then ForeverToldDB = ForeverSagaDB end
@@ -282,39 +334,9 @@ local function InitDB()
     if DB.startLevel == nil then
         DB.startLevel = (#DB.entries > 0 and DB.entries[1].lvl) or UnitLevel("player")
     end
-    -- Version 0.1 stored a timestamp per zone; upgrade to the richer record.
-    for zone, v in pairs(DB.zones) do
-        if type(v) == "number" then DB.zones[zone] = { t = v } end
-    end
-    -- Version 0.4 only kept each killer's latest zone; seed the rivalry map from that.
-    if not DB.gankZones then
-        DB.gankZones = {}
-        for _, g in pairs(DB.grudges) do
-            local z = g.zone or "somewhere unknown"
-            DB.gankZones[z] = DB.gankZones[z] or { kills = 0, revenge = 0 }
-            DB.gankZones[z].kills = DB.gankZones[z].kills + g.kills
-        end
-    end
-    -- Tidy away test-mode leftovers and the grudge lines older versions wrote.
-    local function IsTest(name) return type(name) == "string" and name:find("-Testrealm", 1, true) ~= nil end
-    for i = #DB.entries, 1, -1 do
-        local e = DB.entries[i]
-        if e.test or OFF_JOURNAL[e.kind] or (e.kind == "note" and type(e.text) == "string" and e.text:find("^Paid .+ gold for taking down")) then table.remove(DB.entries, i) end
-    end
-    for _, key in ipairs({ "grudges", "bounties", "posters" }) do
-        for name in pairs(DB[key]) do if IsTest(name) then DB[key][name] = nil end end
-    end
-    for name, b in pairs(DB.bounties) do
-        for poster in pairs(b.posters or {}) do if IsTest(poster) then b.posters[poster] = nil end end
-        if not next(b.posters or {}) then DB.bounties[name] = nil end
-    end
-    for i = #DB.debts, 1, -1 do
-        if IsTest(DB.debts[i].name) or IsTest(DB.debts[i].to) then table.remove(DB.debts, i) end
-    end
-    if DB.testSnapshot then
-        for key, saved in pairs(DB.testSnapshot) do DB[key] = saved end
-        DB.testSnapshot = nil
-    end
+    -- Run each upgrade this character hasn't had yet, once, in order.
+    for i = (DB.version or 0) + 1, #MIGRATIONS do MIGRATIONS[i](DB) end
+    DB.version = #MIGRATIONS
 end
 
 local frame = CreateFrame("Frame")
@@ -384,6 +406,12 @@ SlashCmdList.FOREVERTOLD = function(msg)
     elseif cmd == "note" and rest ~= "" then
         Add("note", rest)
         Print("Added to your story.")
+        return
+    elseif cmd == "epitaph" and ns.ShowEpitaph then
+        ns.ShowEpitaph()
+        return
+    elseif (cmd == "export" or cmd == "import") and ns.ShowTransfer then
+        ns.ShowTransfer(cmd)
         return
     elseif cmd == "loot" then -- older spelling of /told rare
         for _, s in ipairs(ns.SETTINGS) do

@@ -68,6 +68,7 @@ ns.KINDS = {
     fellow = { colour = "40c7eb", filter = "fellows" },
     recap = { colour = "c9a227", filter = "levels" },
     deed = { colour = "ff9d2e", filter = "deeds" },
+    epitaph = { colour = "b8b8c0", filter = "deaths" },
     pvp = { colour = "e05a4c", filter = "pvp" },
     revenge = { colour = "ff4f6d", filter = "pvp" },
 }

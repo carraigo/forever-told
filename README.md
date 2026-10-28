@@ -41,6 +41,7 @@ Everyone you've grouped with is remembered: when and where you first met, and ho
 - Click any grudge to open a parchment **WANTED** poster: portrait, crimes, last seen and reward.
 - Set a reward of **none, 1g, 5g, 10g or any amount you like**, then pin it to your guild's board.
 - **Share** takes a clean screenshot of just the poster, ready to post on Discord.
+- **Posters age:** fresh for the first week, then worn and yellowed, and after three weeks properly weathered, with stains, a torn pin hole and a curled corner. Old grudges stand out at a glance.
 
 ## 🏹 Guild Bounty Board
 
@@ -49,6 +50,14 @@ Everyone you've grouped with is remembered: when and where you first met, and ho
 - **Collect a bounty:** kill anyone on the board and everyone who posted them is avenged: *"Bob avenged you: Stabby is down."*
 - **Witness reports:** spot a wanted player and your guild sees *"last seen in Tarren Mill, 3 minutes ago by Bob."*
 - **Rewards:** addons can't move gold, so rewards are promises. The poster tracks who owes whom, and the person who posted it marks it paid once they've traded or mailed the gold.
+
+## 🪦 Hardcore epitaph
+
+On a Classic Era **Hardcore** character, death is the end of the story. The journal closes with a final line, and a memorial stone sums up the journey: where you fell and to what, how long you adventured, and everything you did along the way. `/told epitaph` shows it, or on a living character, how it would read today.
+
+## 💾 Backups
+
+Export your whole journal as a text code from Settings (or `/told export`) and keep it somewhere safe. Import it to restore a lost journal, or to carry your story over to another character.
 
 ## 🗺️ Atlas & 📊 Stats
 
@@ -76,6 +85,8 @@ A flat, dark window with sidebar navigation, card-style lists, hover details and
 | `/told fellowship` · `deeds` · `atlas` · `stats` · `settings` | Open a page |
 | `/told note <text>` | Add your own line to the journal |
 | `/told recent` | Print the last ten entries to chat |
+| `/told export` · `import` | Back up your story, or bring one back |
+| `/told epitaph` | Show the Hardcore memorial stone |
 | `/told alerts` · `bounty` · `shots` · `banner` · `time` · `rare` · `minimap` | Turn a setting on or off |
 
 `/forevertold` works too.
@@ -86,6 +97,16 @@ A flat, dark window with sidebar navigation, card-style lists, hover details and
 - **Guild features** only work with guildies who also run Forever Told. Bounty sharing and witness reports can be turned off in Settings.
 - **Time per level** asks the game for `/played` once per login, so you'll see that line in chat once. You can turn it off.
 - All data is saved **per character**.
+
+## Running the tests
+
+The tests load the addon outside the game with stand-in WoW functions and play fake events at it. With Lua 5.4 installed, from the repository root:
+
+```
+lua tests/run.lua
+```
+
+GitHub runs them on every push too.
 
 ---
 

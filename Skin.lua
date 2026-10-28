@@ -532,3 +532,40 @@ function S.List(parent)
 
     return sf
 end
+
+-- Screenshot just this frame: hide the rest of the interface for a moment,
+-- take the picture, then put everything back where it was.
+function S.Snapshot(frame, hide, done)
+    if InCombatLockdown() then
+        ns.Print("Wait until you're out of combat to take the picture.")
+        return
+    end
+    local parent, scale, strata = frame:GetParent(), frame:GetScale(), frame:GetFrameStrata()
+    local points = {}
+    for i = 1, (frame:GetNumPoints() or 0) do points[i] = { frame:GetPoint(i) } end
+    local effective = frame:GetEffectiveScale() / WorldFrame:GetEffectiveScale()
+    for _, f in ipairs(hide or {}) do f:Hide() end
+    frame:SetParent(WorldFrame)
+    frame:SetScale(effective)
+    frame:ClearAllPoints()
+    frame:SetPoint("CENTER")
+    frame:SetFrameStrata("FULLSCREEN_DIALOG")
+    UIParent:Hide()
+    C_Timer.After(0.2, function()
+        Screenshot()
+        C_Timer.After(0.6, function()
+            UIParent:Show()
+            frame:SetParent(parent or UIParent)
+            frame:SetScale(scale or 1)
+            frame:ClearAllPoints()
+            if #points > 0 then
+                for _, p in ipairs(points) do frame:SetPoint(unpack(p)) end
+            else
+                frame:SetPoint("CENTER")
+            end
+            frame:SetFrameStrata(strata or "DIALOG")
+            for _, f in ipairs(hide or {}) do f:Show() end
+            if done then ns.Print(done) end
+        end)
+    end)
+end
