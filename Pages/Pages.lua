@@ -1,6 +1,6 @@
 -- Forever Told pages. Each page gives the window a title, a subtitle, an
 -- optional badge for the sidebar, controls (build) and list rows (items).
--- The window itself lives in UI.lua; each page has its own file in Pages\.
+-- The window itself lives in UI\Window.lua; each page has its own file here.
 -- This file holds what the pages share.
 
 local _, ns = ...

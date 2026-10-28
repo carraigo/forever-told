@@ -6,7 +6,7 @@
 - Wanted posters now age: fresh for a week, then worn, then weathered after three weeks, with stains, a torn pin hole and a curled corner.
 
 **Under the hood**
-- Each page now lives in its own file.
+- Files are sorted into folders: Core, Features, UI and Pages, with each page in its own file.
 - Saved-data upgrades run once per character instead of on every login.
 - Automated tests ship with the source.
 

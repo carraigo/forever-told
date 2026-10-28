@@ -176,7 +176,7 @@ handlers.PLAYER_DEAD = function()
     DB.deaths = DB.deaths + 1
     DB.deathZones[zone] = (DB.deathZones[zone] or 0) + 1
     Bump("deaths")
-    -- Killed by a player: Grudges.lua already wrote a better line.
+    -- Killed by a player: that goes on the Grudges page instead.
     if ns.pvpDeath then ns.pvpDeath = nil return end
     Add("death", Pick(ns.FLAVOUR.death):format(zone))
 end

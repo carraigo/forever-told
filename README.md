@@ -98,6 +98,17 @@ A flat, dark window with sidebar navigation, card-style lists, hover details and
 - **Time per level** asks the game for `/played` once per login, so you'll see that line in chat once. You can turn it off.
 - All data is saved **per character**.
 
+## Project layout
+
+| Folder | What's in it |
+|---|---|
+| `Core` | Saved data, upgrades, settings, slash commands and the journal itself |
+| `Features` | What the addon tracks: fellowship, deeds, recaps, grudges, bounties, backups and the epitaph |
+| `UI` | The widget kit, main window, pop-ups, minimap button and wanted posters |
+| `Pages` | One file per page of the journal window |
+| `tests` | Automated tests (not shipped in the addon) |
+| `media` | Logos for CurseForge and this page (not shipped) |
+
 ## Running the tests
 
 The tests load the addon outside the game with stand-in WoW functions and play fake events at it. With Lua 5.4 installed, from the repository root:

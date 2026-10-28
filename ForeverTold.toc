@@ -7,18 +7,18 @@
 ## AddonCompartmentFunc: ForeverTold_OnAddonCompartmentClick
 ## SavedVariablesPerCharacter: ForeverToldDB, ForeverSagaDB
 
-Data.lua
-Util.lua
-Core.lua
-Fellowship.lua
-Recap.lua
-Deeds.lua
-Grudges.lua
-Bounty.lua
-Skin.lua
-Wanted.lua
-Transfer.lua
-Epitaph.lua
+Core\Data.lua
+Core\Util.lua
+Core\Core.lua
+Features\Fellowship.lua
+Features\Recap.lua
+Features\Deeds.lua
+Features\Grudges.lua
+Features\Bounty.lua
+UI\Skin.lua
+UI\Wanted.lua
+Features\Transfer.lua
+Features\Epitaph.lua
 Pages\Pages.lua
 Pages\Journal.lua
 Pages\Fellowship.lua
@@ -27,6 +27,6 @@ Pages\Grudges.lua
 Pages\Atlas.lua
 Pages\Stats.lua
 Pages\Settings.lua
-UI.lua
-Popups.lua
-Minimap.lua
+UI\Window.lua
+UI\Popups.lua
+UI\Minimap.lua
