@@ -1,5 +1,5 @@
 -- Forever Told window: a flat, dark, resizable window with a sidebar, a
--- header with search, and one page at a time. The pages are in Pages.lua.
+-- header with search, and one page at a time. The pages are in Pages\.
 
 local _, ns = ...
 local U, S = ns.U, ns.Skin
