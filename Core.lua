@@ -74,8 +74,16 @@ ns.PlayedNow = PlayedNow
 
 -- Entries --------------------------------------------------------------------
 
+-- Grudges and posters live on the Grudges page, not in the story.
+local OFF_JOURNAL = { pvp = true, revenge = true }
+
 function ns.Add(kind, text, level)
     local DB = ns.DB
+    if OFF_JOURNAL[kind] then
+        if ns.CheckDeeds then ns.CheckDeeds() end
+        if ns.Refresh then ns.Refresh() end
+        return
+    end
     local entry = { t = time(), lvl = level or UnitLevel("player"), zone = Zone(), kind = kind, text = text }
     table.insert(DB.entries, entry)
     if ns.CheckDeeds then ns.CheckDeeds() end
@@ -287,10 +295,11 @@ local function InitDB()
             DB.gankZones[z].kills = DB.gankZones[z].kills + g.kills
         end
     end
-    -- Test mode is gone; tidy away anything it left behind.
+    -- Tidy away test-mode leftovers and the grudge lines older versions wrote.
     local function IsTest(name) return type(name) == "string" and name:find("-Testrealm", 1, true) ~= nil end
     for i = #DB.entries, 1, -1 do
-        if DB.entries[i].test then table.remove(DB.entries, i) end
+        local e = DB.entries[i]
+        if e.test or OFF_JOURNAL[e.kind] or (e.kind == "note" and type(e.text) == "string" and e.text:find("^Paid .+ gold for taking down")) then table.remove(DB.entries, i) end
     end
     for _, key in ipairs({ "grudges", "bounties", "posters" }) do
         for name in pairs(DB[key]) do if IsTest(name) then DB[key][name] = nil end end

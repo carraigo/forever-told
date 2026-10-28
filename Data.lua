@@ -83,7 +83,6 @@ ns.FILTERS = {
     { id = "deaths", label = "Deaths" },
     { id = "fellows", label = "Friends" },
     { id = "deeds", label = "Deeds" },
-    { id = "pvp", label = "PvP" },
     { id = "notes", label = "Notes" },
 }
 

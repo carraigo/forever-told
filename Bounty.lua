@@ -267,7 +267,7 @@ function ns.MarkPaid(index)
     local debt = table.remove(DB.debts, index)
     if not debt then return end
     Send(("$~%s~%d~%s"):format(debt.name, debt.gold, debt.to))
-    ns.Add("note", ("Paid %s %d gold for taking down %s."):format(Short(debt.to), debt.gold, Short(debt.name)))
+    ns.Add("revenge", ("Paid %s %d gold for taking down %s."):format(Short(debt.to), debt.gold, Short(debt.name)))
 end
 
 function OnPaid(name, gold, sender)

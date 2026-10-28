@@ -181,7 +181,6 @@ local function Preview()
     poster.controls.mine:SetShown(info.mine and not info.settled)
     poster.controls.theirs:SetShown(not info.mine or info.settled)
     poster.controls.segments:Sync()
-    poster.controls.custom:SetShown(draft.custom)
     local pinned = ns.DB.posters[info.name] and not ns.DB.posters[info.name].done
     poster.controls.pin:SetLabel(pinned and "Update poster" or "Pin poster")
     poster.controls.remove:SetShown(pinned and true or false)
@@ -191,7 +190,7 @@ local function Pin()
     local name = draft.name
     ns.DB.posters[name] = { reward = draft.reward, t = time() }
     ns.PostBounty(name)
-    local where = ns.DB.shareBounties and IsInGuild() and "on your guild's bounty board" or "in your journal (sharing is off)"
+    local where = ns.DB.shareBounties and IsInGuild() and "on your guild's bounty board" or "on your grudge list (sharing is off)"
     ns.Add("pvp", ("Pinned a wanted poster for %s%s."):format(Short(name), draft.reward > 0 and (", %d gold reward"):format(draft.reward) or ""))
     ns.ShowToast("Poster pinned", Short(name), "Now " .. where)
     Preview()
@@ -336,6 +335,8 @@ local function CreatePoster()
                 c.custom:SetFocus()
             else
                 draft.custom, draft.reward = false, id
+                c.custom:SetText("")
+                c.custom:ClearFocus()
             end
             Preview()
         end, 42)
@@ -344,12 +345,18 @@ local function CreatePoster()
     c.custom:SetPoint("TOPRIGHT", -10, -10)
     c.custom:SetNumeric(true)
     c.custom:SetMaxLetters(4)
+    -- The box is always there: typing in it picks "custom" by itself.
     c.custom:HookScript("OnTextChanged", function(self, typed)
         if not typed then return end
+        draft.custom = true
         draft.reward = math.min(MAX_REWARD, tonumber(self:GetText()) or 0)
         Preview()
     end)
-    c.custom:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
+    c.custom:HookScript("OnEditFocusGained", function()
+        if not draft.custom then draft.custom = true Preview() end
+    end)
+    -- Enter pins (or updates) the poster with the amount typed.
+    c.custom:SetScript("OnEnterPressed", function(self) self:ClearFocus() Pin() end)
     c.pin = S.Button(c.mine, "Pin poster", 104, 26, "primary")
     c.pin:SetPoint("BOTTOMRIGHT", -10, 12)
     c.pin:SetScript("OnClick", Pin)

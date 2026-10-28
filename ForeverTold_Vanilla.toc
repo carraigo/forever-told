@@ -2,7 +2,7 @@
 ## Title: Forever Told
 ## Notes: Your story, forever told. A journal of your journey to 60: first visits, level-ups, bosses, quests, loot, friends, deeds and chapter recaps, plus grudges, wanted posters and a guild bounty board for sweet revenge. Type /told or click the book on your minimap.
 ## Author: SMUGDUCK
-## Version: 0.8.2
+## Version: 0.8.3
 ## IconTexture: Interface\Icons\INV_Misc_Book_09
 ## AddonCompartmentFunc: ForeverTold_OnAddonCompartmentClick
 ## SavedVariablesPerCharacter: ForeverToldDB, ForeverSagaDB

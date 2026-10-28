@@ -4,9 +4,9 @@
 
 ### *Your story, forever told.*
 
-Forever Told writes your adventure down as you play. Every new zone, every level, every boss, every friend and every player who ganked you on the road to Tarren Mill goes into a living journal, grouped into chapters as you climb to 60.
+Forever Told writes your adventure down as you play. Every new zone, every level, every boss and every friend goes into a living journal, grouped into chapters as you climb to 60.
 
-And when someone wrongs you, Forever Told never forgets. Keep a grudge list, pin **wanted posters** with a gold reward, and share a **bounty board** with your guild so that anyone can take your revenge for you.
+And when someone wrongs you, Forever Told never forgets. Grudges get their own page, away from your story. Keep a grudge list, pin **wanted posters** with a gold reward, and share a **bounty board** with your guild so that anyone can take your revenge for you.
 
 Made for **WoW Forever** and **Classic Era / Hardcore**. It uses no combat data on Forever, so it works within the Midnight addon restrictions.
 
@@ -18,7 +18,7 @@ Made for **WoW Forever** and **Classic Era / Hardcore**. It uses no combat data 
 - **Chapters:** your story is split into seven named chapters, from *First Steps* to *Legend*, one for every ten levels.
 - **Chapter recaps:** at levels 10, 20, 30 and so on, the chapter you just finished is summed up: new places, quests, dungeon runs, bosses, friends, deeds, deaths and time played.
 - **Your own notes:** add a line whenever something memorable happens.
-- **Filters and search:** show only places, levels, loot, PvP and so on, newest or oldest first, and search any page.
+- **Filters and search:** show only places, levels, loot and so on, newest or oldest first, and search any page.
 - **Level-up moments:** a slim banner (held until combat ends) and an automatic screenshot every time you ding.
 
 ## 🤝 Fellowship
@@ -32,7 +32,7 @@ Everyone you've grouped with is remembered: when and where you first met, and ho
 ## ⚔️ Grudges & Revenge
 
 - **Grudge list:** every player who kills you, with their class, level, guild, where they were last seen, and a running score of your revenge against their kills.
-- **Sweet revenge:** kill them back and it goes in the journal: *"Sweet revenge on Stabby! Score: 2 to 3."*
+- **Sweet revenge:** kill them back and the score updates: *"Sweet revenge on Stabby! Score: 2 to 3."*
 - **Nemesis nearby:** a red warning when someone on your list shows up on your nameplates, target or mouseover.
 - **Rivalry map:** which zones you get ganked in, where you hit back, and what time of day it happens.
 
