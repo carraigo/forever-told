@@ -180,13 +180,14 @@ local ticker
 ns.On("PLAYER_ENTERING_WORLD", function()
     if ticker then return end
     ticker = C_Timer.NewTicker(3, function()
-        local mounted = IsMounted and IsMounted() or false
+        local onTaxi = UnitOnTaxi and UnitOnTaxi("player") or false
+        -- The game counts a flight path as being mounted; that's not your own mount.
+        local mounted = not onTaxi and IsMounted and IsMounted() or false
         if mounted and not wasMounted and C("mounted") == 0 then
             Inc("mounted")
             ns.CheckDeeds()
         end
         wasMounted = mounted
-        local onTaxi = UnitOnTaxi and UnitOnTaxi("player") or false
         if onTaxi and not wasOnTaxi then
             Inc("flights")
             ns.CheckDeeds()

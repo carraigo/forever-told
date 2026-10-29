@@ -104,6 +104,19 @@ test("level-ups and quests are written down", function()
     assert(kinds("level") > 0, "no level entry")
 end)
 
+test("a flight path isn't your first mount", function()
+    IsMounted = function() return true end
+    UnitOnTaxi = function() return true end
+    TICK()
+    eq(DB.deeds.mount, nil, "Saddle Up from a flight")
+    eq(DB.counters.flights, 1, "flight counted")
+    UnitOnTaxi = function() return false end
+    TICK()
+    assert(DB.deeds.mount, "a real mount didn't count")
+    IsMounted = function() return false end
+    TICK()
+end)
+
 -- Grudges --------------------------------------------------------------------------------
 
 test("a player kill makes a grudge, not a journal line", function()
