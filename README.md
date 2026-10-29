@@ -51,6 +51,17 @@ Everyone you've grouped with is remembered: when and where you first met, and ho
 - **Witness reports:** spot a wanted player and your guild sees *"last seen in Tarren Mill, 3 minutes ago by Bob."*
 - **Rewards:** addons can't move gold, so rewards are promises. The poster tracks who owes whom, and the person who posted it marks it paid once they've traded or mailed the gold.
 
+## 📖 Guild Chronicle
+
+A page with one feed for the whole guild. Guildies running Forever Told share their big moments, grouped by day:
+
+- **Every 10th level, and 60**, with time played, quests and places when someone finishes the journey.
+- **Epic loot**, and where it dropped.
+- **First runs of each dungeon**, with who came along.
+- **Deeds earned**, and **Hardcore deaths** with their epitaph.
+
+When you log in, online guildies fill in what you missed. The chronicle keeps the last 30 days, and sharing can be turned off in Settings.
+
 ## 🪦 Hardcore epitaph
 
 On a Classic Era **Hardcore** character, death is the end of the story. The journal closes with a final line, and a memorial stone sums up the journey: where you fell and to what, how long you adventured, and everything you did along the way. `/told epitaph` shows it, or on a living character, how it would read today.
@@ -61,8 +72,8 @@ Export your whole journal as a text code from Settings (or `/told export`) and k
 
 ## 🗺️ Atlas & 📊 Stats
 
-- **Atlas:** every place you've discovered, by continent, with the level and date you first arrived, plus dungeons, bosses defeated and the zones where you've been ganked.
-- **Stats:** time played, fastest and slowest levels, a time-per-level chart, deadliest zone, most gold held, bounties collected, and a breakdown of every chapter.
+- **Atlas:** how much of each continent you've explored (*Eastern Kingdoms · 18 of 34 zones*), with the zones still to explore greyed out. Hover a zone for its story: the level and date you arrived, time spent, quests, foes slain, deaths and ganks there. Tiles show your favourite place, where you've done the most quests and the deadliest zone, plus dungeons and bosses defeated.
+- **Stats:** your **deadliest foes**, monster or player, with a nemesis card for your top killer, the **foes you've slain the most**, your toughest kill, time played, fastest and slowest levels, a time-per-level chart, most gold held, bounties collected, and a breakdown of every chapter.
 
 ## 🎨 A modern interface
 
@@ -82,19 +93,20 @@ A flat, dark window with sidebar navigation, card-style lists, hover details and
 |---|---|
 | `/told` | Open or close the journal (or click the minimap book) |
 | `/told grudges` · `bounties` · `wanted` · `rivals` | Jump to a Grudges view |
-| `/told fellowship` · `deeds` · `atlas` · `stats` · `settings` | Open a page |
+| `/told fellowship` · `deeds` · `chronicle` · `atlas` · `stats` · `settings` | Open a page |
 | `/told note <text>` | Add your own line to the journal |
 | `/told recent` | Print the last ten entries to chat |
 | `/told export` · `import` | Back up your story, or bring one back |
 | `/told epitaph` | Show the Hardcore memorial stone |
-| `/told alerts` · `bounty` · `shots` · `banner` · `time` · `rare` · `minimap` | Turn a setting on or off |
+| `/told alerts` · `bounty` · `milestones` · `shots` · `banner` · `time` · `rare` · `minimap` | Turn a setting on or off |
 
 `/forevertold` works too.
 
 ## Good to know
 
-- **Who killed you:** Classic Era gives addons the combat log, so the killer is exact. WoW Forever closes it, so Forever Told blames whichever hostile player was targeting you in your last 15 seconds, and marks it as a best guess.
-- **Guild features** only work with guildies who also run Forever Told. Bounty sharing and witness reports can be turned off in Settings.
+- **Who killed you:** Classic Era gives addons the combat log, so the killer is exact. WoW Forever closes it, so Forever Told blames whichever enemy was targeting you in your last 15 seconds, and marks it as a best guess.
+- **Foes slain** are counted from the "dies, you gain experience" message, so grey enemies that give no experience aren't counted.
+- **Guild features** only work with guildies who also run Forever Told. Bounty sharing, witness reports and the chronicle can be turned off in Settings.
 - **Time per level** asks the game for `/played` once per login, so you'll see that line in chat once. You can turn it off.
 - All data is saved **per character**.
 
@@ -103,7 +115,7 @@ A flat, dark window with sidebar navigation, card-style lists, hover details and
 | Folder | What's in it |
 |---|---|
 | `Core` | Saved data, upgrades, settings, slash commands and the journal itself |
-| `Features` | What the addon tracks: fellowship, deeds, recaps, grudges, bounties, backups and the epitaph |
+| `Features` | What the addon tracks: fellowship, deeds, recaps, grudges, places, foes, bounties, the guild chronicle, backups and the epitaph |
 | `UI` | The widget kit, main window, pop-ups, minimap button and wanted posters |
 | `Pages` | One file per page of the journal window |
 | `tests` | Automated tests (not shipped in the addon) |

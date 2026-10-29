@@ -1,3 +1,17 @@
+## v1.0
+
+**New**
+- Guild Chronicle: a new page with one feed for your guild. Guildies running Forever Told share every 10th level (and 60), epic loot, first dungeon runs, deeds and Hardcore deaths, grouped by day. Online guildies fill in what you missed when you log in, and the last 30 days are kept. Turn sharing off in Settings or with `/told milestones`.
+- Deadliest foes on the Stats page: what killed you most, monster or player, with a nemesis card for your top killer.
+- Foes slain on the Stats page: the foes you've slain the most, total kills, how many different kinds, and your toughest kill. A "Foes slain" tile replaces Places.
+- Atlas: completion for each continent ("Eastern Kingdoms · 18 of 34 zones") with the zones still to explore greyed out.
+- Atlas: hover a zone for its story: when and at what level you arrived, time spent there, quests, foes slain, deaths and ganks.
+- Atlas: tiles for your favourite place, where you've done the most quests and the deadliest zone.
+
+**Changes**
+- Dungeons you ran before v1.0 won't be announced in the chronicle.
+- Kills and time per zone only start counting from v1.0.
+
 ## v0.9
 
 **New**

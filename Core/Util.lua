@@ -37,6 +37,14 @@ function U.ClassColour(classFile, fallback)
     return fallback or { 0.94, 0.93, 0.89, 1 }
 end
 
+-- 3412 -> "3,412"
+function U.Number(n)
+    if BreakUpLargeNumbers then return BreakUpLargeNumbers(n) end
+    local s = tostring(math.floor(n))
+    local out = s:reverse():gsub("(%d%d%d)", "%1,"):reverse()
+    return (out:gsub("^,", ""))
+end
+
 function U.Duration(sec)
     if not sec then return "unknown" end
     sec = math.floor(sec)

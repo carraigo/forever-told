@@ -5,8 +5,7 @@
 
 local _, ns = ...
 local U, S = ns.U, ns.Skin
-local Count, Plural, Short = U.Count, U.Plural, U.Short
-local issecret = U.issecret
+local Count, Plural = U.Count, U.Plural
 
 local STONE = { 0.33, 0.33, 0.35, 1 }
 local CARVED = { 0.86, 0.84, 0.78, 1 }
@@ -21,11 +20,6 @@ local CLOSINGS = {
     "May the next one go further.",
 }
 
-local ENVIRONMENT = {
-    Falling = "a long fall", Drowning = "the deep water", Fatigue = "exhaustion",
-    Fire = "the flames", Lava = "molten lava", Slime = "toxic slime",
-}
-
 function ns.IsHardcore()
     if C_GameRules and C_GameRules.IsHardcoreActive then
         local ok, on = pcall(C_GameRules.IsHardcoreActive)
@@ -38,24 +32,8 @@ function ns.IsHardcore()
     return false
 end
 
--- Era: the combat log says what hit us last, monster or player or the ground.
-local DAMAGE = { SWING_DAMAGE = true, SPELL_DAMAGE = true, RANGE_DAMAGE = true, SPELL_PERIODIC_DAMAGE = true }
-local lastHit -- { what, t }
-ns.On("COMBAT_LOG_EVENT_UNFILTERED", function()
-    if not CombatLogGetCurrentEventInfo then return end
-    local _, sub, _, _, srcName, _, _, dstGUID, _, _, _, envType = CombatLogGetCurrentEventInfo()
-    if issecret(sub) or issecret(dstGUID) or dstGUID ~= UnitGUID("player") then return end
-    if sub == "ENVIRONMENTAL_DAMAGE" then
-        lastHit = { what = ENVIRONMENT[envType] or "the world itself", t = GetTime() }
-    elseif DAMAGE[sub] and srcName and not issecret(srcName) then
-        lastHit = { what = Short(srcName), t = GetTime() }
-    end
-end)
-
-local function Cause()
-    if ns.pvpDeath and ns.lastKiller then return Short(ns.lastKiller) end
-    if lastHit and GetTime() - lastHit.t < 15 then return lastHit.what end
-end
+-- What killed us comes from the foe tracker, which has already run for this death.
+local function Cause() return ns.lastFoe end
 
 -- Everything the stone says, from the journal as it stands.
 local function Summary(cause)
@@ -186,6 +164,7 @@ ns.On("PLAYER_DEAD", function()
         local e = Summary(cause)
         ns.DB.epitaph = e
         ns.Add("epitaph", ("The end. %s fell at level %d in %s%s."):format(e.name, e.lvl, e.zone, cause and (", to " .. cause) or ""))
+        ns.Emit("epitaph", e)
         ns.ShowEpitaph()
     end)
 end)

@@ -1,10 +1,82 @@
--- Stats page: tiles, the journey in numbers, chapters and time per level.
+-- Stats page: tiles, deadliest foes and foes slain, the journey in numbers,
+-- chapters and time per level.
 
 local _, ns = ...
 local U, S, K = ns.U, ns.Skin, ns.PageKit
 local C = S.colours
-local Count, Duration = U.Count, U.Duration
+local Count, Duration, Plural, Number = U.Count, U.Duration, U.Plural, U.Number
 local RED, ChapterTitle, GrudgeTotals = K.RED, K.ChapterTitle, K.GrudgeTotals
+
+local CLASSIFICATION = { elite = "elite", rareelite = "rare elite", rare = "rare", worldboss = "boss" }
+local TOP = 5
+
+local function FoeName(e)
+    if e.f.player then return e.name .. " |cff8a8a8a(player)|r" end
+    return e.name
+end
+
+-- Where a foe got us: "all in Westfall" or "most often in Duskwood".
+local function WhereDied(f)
+    local best, most, places = nil, 0, 0
+    for zone, n in pairs(f.diedIn or {}) do
+        places = places + 1
+        if n > most then best, most = zone, n end
+    end
+    if not best then return nil end
+    if places == 1 then return (f.deaths > 1 and "all in " or "in ") .. best end
+    return "most often in " .. best
+end
+
+local function Foes(items, stat)
+    local DB = ns.DB
+    local deadly, slain = ns.DeadliestFoes(), ns.SlainFoes()
+    if #deadly > 0 then
+        items[#items + 1] = { type = "header", text = "Deadliest foes", right = "deaths" }
+        local top = deadly[1].n
+        for i = 1, math.min(TOP, #deadly) do
+            local e = deadly[i]
+            local lines = { ("Killed you %s"):format(Plural(e.n, "time")), WhereDied(e.f) }
+            if e.f.kills > 0 then lines[#lines + 1] = ("You've slain %s of them"):format(Number(e.f.kills)) end
+            if not e.f.exact and not e.f.env then lines[#lines + 1] = "Best guess: it was targeting you when you died" end
+            items[#items + 1] = { type = "bar", label = FoeName(e), labelWidth = 170, valueWidth = 60, height = 24, colour = RED,
+                fraction = e.n / top, value = tostring(e.n), tip = { title = e.name, lines = lines } }
+        end
+        -- A nemesis is a clear top killer, and something with a will of its own.
+        local foes = {}
+        for _, e in ipairs(deadly) do if not e.f.env then foes[#foes + 1] = e end end
+        local n = foes[1]
+        if n and n.n >= 2 and (not foes[2] or foes[2].n < n.n) then
+            local sub = ("Killed you %s%s."):format(Plural(n.n, "time"), WhereDied(n.f) and (", " .. WhereDied(n.f)) or "")
+            if n.f.kills > 0 then sub = sub .. (" You've slain %s of them."):format(Number(n.f.kills)) end
+            items[#items + 1] = { type = "gap", size = 4 }
+            items[#items + 1] = { text = (n.f.player and "Your nemesis: " or "Nemesis of the wilds: ") .. n.name, colour = RED, dot = RED, card = true, sub = sub }
+        end
+        items[#items + 1] = { type = "gap" }
+    end
+    if #slain > 0 then
+        items[#items + 1] = { type = "header", text = "Foes slain the most", right = "kills" }
+        local top = slain[1].n
+        for i = 1, math.min(TOP, #slain) do
+            local e = slain[i]
+            local best, most = nil, 0
+            for zone, k in pairs(e.f.zones) do if k > most then best, most = zone, k end end
+            items[#items + 1] = { type = "bar", label = e.name, labelWidth = 170, valueWidth = 60, height = 24,
+                fraction = e.n / top, value = Number(e.n),
+                tip = { title = e.name, lines = { ("Slain %s"):format(Plural(e.n, "time")), best and ("Mostly in " .. best) or nil,
+                    e.f.deaths > 0 and ("Killed you %s"):format(Plural(e.f.deaths, "time")) or nil } } }
+        end
+        items[#items + 1] = { type = "gap" }
+        items[#items + 1] = { type = "header", text = "The hunt" }
+        local kills, kinds = ns.FoeTotals()
+        stat("Foes slain", Number(kills))
+        stat("Different kinds", Number(kinds))
+        local t = DB.toughest
+        if t then
+            stat("Toughest kill", ("%s, level %d%s"):format(t.name, t.level, t.class and (" " .. (CLASSIFICATION[t.class] or t.class)) or ""))
+        end
+        items[#items + 1] = { type = "gap" }
+    end
+end
 
 ns.Pages.stats = {
     title = "Stats", icon = "Interface\\Icons\\INV_Misc_PocketWatch_01",
@@ -19,11 +91,12 @@ ns.Pages.stats = {
             { type = "tiles", tiles = {
                 { label = "Time played", value = played and Duration(played) or "–" },
                 { label = "Quests", value = tostring(DB.quests) },
-                { label = "Places", value = tostring(Count(DB.zones)) },
+                { label = "Foes slain", value = Number((ns.FoeTotals())) },
                 { label = "Deaths", value = tostring(DB.deaths), colour = RED },
             } },
         }
         local function stat(label, value) items[#items + 1] = { type = "stat", label = label, value = tostring(value) } end
+        Foes(items, stat)
 
         items[#items + 1] = { type = "header", text = "The adventurer" }
         local race = UnitRace and UnitRace("player") or ""

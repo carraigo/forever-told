@@ -65,7 +65,8 @@ ForeverToldDB = {
         { t = 3, lvl = 6, kind = "pvp", text = "Ganked by Someone." },
         { t = 4, lvl = 6, kind = "note", text = "Paid Bob 5 gold for taking down Someone." },
     },
-    zones = { ["Elwynn Forest"] = 100 },
+    zones = { ["Elwynn Forest"] = 100, ["The Deadmines"] = { t = 50, lvl = 18, instance = true } },
+    deathZones = { ["Elwynn Forest"] = 2 },
     grudges = { ["Gank-Testrealm"] = { kills = 1, revenge = 0 }, Real = { kills = 1, revenge = 0, first = 1 } },
     posters = { ["Gank-Testrealm"] = { reward = 5 } },
     bounties = { Vex = { posters = { ["Hild-Realm"] = { kills = 1, ours = 0 } }, t = os.time() - 100 } },
@@ -81,7 +82,8 @@ print("Forever Told tests")
 -- Upgrades -----------------------------------------------------------------------------
 
 test("upgrades run once and tidy old data", function()
-    eq(DB.version, 4, "version")
+    eq(DB.version, 5, "version")
+    eq(DB.chronicled["The Deadmines"], true, "old dungeon runs aren't chronicle news")
     eq(type(DB.zones["Elwynn Forest"]), "table", "old zone record upgraded")
     eq(DB.entries[1].text, "my own note", "own notes kept")
     eq(kinds("pvp"), 0, "old grudge lines removed")
@@ -100,6 +102,19 @@ test("level-ups and quests are written down", function()
     FIRE("QUEST_TURNED_IN", 1)
     assert(#DB.entries > before, "no new entries")
     assert(kinds("level") > 0, "no level entry")
+end)
+
+test("a flight path isn't your first mount", function()
+    IsMounted = function() return true end
+    UnitOnTaxi = function() return true end
+    TICK()
+    eq(DB.deeds.mount, nil, "Saddle Up from a flight")
+    eq(DB.counters.flights, 1, "flight counted")
+    UnitOnTaxi = function() return false end
+    TICK()
+    assert(DB.deeds.mount, "a real mount didn't count")
+    IsMounted = function() return false end
+    TICK()
 end)
 
 -- Grudges --------------------------------------------------------------------------------
@@ -265,10 +280,186 @@ test("the preview reads as a preview", function()
     DB.epitaph = saved
 end)
 
+-- Foes ----------------------------------------------------------------------------------
+
+test("foes slain are counted from the experience message", function()
+    local kills = NS.FoeTotals()
+    FIRE("CHAT_MSG_COMBAT_XP_GAIN", "Defias Bandit dies, you gain 45 experience.")
+    FIRE("CHAT_MSG_COMBAT_XP_GAIN", "Defias Bandit dies, you gain 45 experience. (+22 exp Rested bonus)")
+    FIRE("CHAT_MSG_COMBAT_XP_GAIN", "You gain 120 experience.")
+    eq(NS.FoeTotals(), kills + 2, "kills")
+    eq(DB.foes["Defias Bandit"].kills, 2, "bandit kills")
+    eq(DB.foes["Defias Bandit"].zones["Elwynn Forest"], 2, "kills by zone")
+    eq(DB.zoneStats["Elwynn Forest"].kills, 2, "zone story kills")
+end)
+
+test("the toughest kill is the highest level elite", function()
+    TARGETNAME = "Mor'Ladim"
+    UnitClassification = function(u) return u == "target" and "elite" or "normal" end
+    FIRE("CHAT_MSG_COMBAT_XP_GAIN", "Mor'Ladim dies, you gain 300 experience.")
+    eq(DB.toughest and DB.toughest.name, "Mor'Ladim", "toughest")
+    eq(DB.toughest.class, "elite", "elite")
+    TARGETNAME = "Young Wolf"
+    UnitClassification = function() return "normal" end
+    FIRE("CHAT_MSG_COMBAT_XP_GAIN", "Young Wolf dies, you gain 300 experience.")
+    eq(DB.toughest.name, "Mor'Ladim", "a normal wolf isn't tougher")
+    TARGETNAME = "Stabby"
+end)
+
+test("deadliest foes come from every death", function()
+    local deadly = NS.DeadliestFoes()
+    eq(deadly[1].name, "Stitches", "top killer")
+    eq(deadly[1].n, 2, "Stitches' kills")
+    eq(DB.foes.Stabby and DB.foes.Stabby.player, true, "a player killer is marked")
+    eq(DB.foes["a long fall"] and DB.foes["a long fall"].env, true, "falling counts")
+end)
+
+local function Rows(id)
+    local found = {}
+    for _, item in ipairs(NS.Pages[id].items()) do
+        found[#found + 1] = item
+        for _, t in ipairs(item.tiles or {}) do found[#found + 1] = { text = t.value, label = t.label } end
+    end
+    return found
+end
+local function Find(rows, pattern)
+    for _, r in ipairs(rows) do
+        for _, k in ipairs({ "text", "label", "value", "right", "sub" }) do
+            if type(r[k]) == "string" and r[k]:find(pattern) then return r end
+        end
+    end
+end
+
+test("the stats page shows the foes", function()
+    local rows = Rows("stats")
+    assert(Find(rows, "^Deadliest foes$"), "no deadliest foes")
+    assert(Find(rows, "^Foes slain the most$"), "no foes slain")
+    assert(Find(rows, "^Nemesis of the wilds: Stitches$"), "no nemesis card")
+    assert(Find(rows, "Mor'Ladim, level 30 elite"), "no toughest kill")
+    assert(Find(rows, "^Foes slain$"), "no foes slain tile")
+    assert(Find(rows, "Stabby .*player"), "player not marked")
+end)
+
+-- Atlas ---------------------------------------------------------------------------------
+
+test("the atlas tracks each continent and tells each zone's story", function()
+    C_Map.GetMapInfo = function(id)
+        if id == 13 then return { name = "Eastern Kingdoms", mapType = 2 } end
+        return { name = "Duskwood", mapType = 3, parentMapID = 13 }
+    end
+    C_Map.GetMapChildrenInfo = function(id)
+        if id ~= 13 then return {} end
+        return { { name = "Duskwood" }, { name = "Elwynn Forest" }, { name = "Westfall" }, { name = "Redridge Mountains" }, { name = "Westfall" } }
+    end
+    GetRealZoneText = function() return "Duskwood" end
+    FIRE("ZONE_CHANGED_NEW_AREA")
+    eq(DB.continents[13], "Eastern Kingdoms", "continent remembered")
+    FIRE("QUEST_TURNED_IN", 2)
+    NOWT = NOWT + 3600
+    GetRealZoneText = function() return "Elwynn Forest" end
+    FIRE("ZONE_CHANGED_NEW_AREA")
+    eq(DB.zoneStats.Duskwood.quests, 1, "quests in Duskwood")
+    eq(DB.zoneStats.Duskwood.time, 3600, "time in Duskwood")
+    local rows = Rows("atlas")
+    assert(Find(rows, "^2 of 4 zones$"), "no completion")
+    local unseen = Find(rows, "^Still to explore$")
+    assert(unseen and unseen.sub:find("Westfall") and unseen.sub:find("Redridge"), "unvisited zones missing")
+    local dusk
+    for _, r in ipairs(rows) do if r.text == "Duskwood" and r.tip then dusk = r end end
+    assert(dusk and dusk.tip, "no story")
+    assert(table.concat(dusk.tip.lines, "\n"):find("1 quest"), "story has no quests")
+    assert(Find(rows, "Favourite · 1h"), "no favourite place")
+    local deadly = Find(rows, "^Deadliest")
+    eq(deadly and deadly.text, "Elwynn Forest", "deadliest zone")
+end)
+
+-- Guild chronicle ------------------------------------------------------------------------
+
+local function Sent(pattern)
+    for _, m in ipairs(ADDONMSG) do if m:find(pattern) then return m end end
+end
+
+test("a guildie's milestone reaches the chronicle once", function()
+    local before = #DB.chronicle
+    local t = time() - 3600
+    FIRE("CHAT_MSG_ADDON", "FTold1", ("M~Hild-Realm~%d~level~PALADIN~40~40~Stranglethorn Vale~"):format(t), "GUILD", "Hild-Realm")
+    FIRE("CHAT_MSG_ADDON", "FTold1", ("M~Hild-Realm~%d~level~PALADIN~40~40~Stranglethorn Vale~"):format(t), "GUILD", "Bob-Realm")
+    eq(#DB.chronicle, before + 1, "stored once")
+    FIRE("CHAT_MSG_ADDON", "FTold1", ("M~Old~%d~level~MAGE~20~20~Duskwood~"):format(time() - DAY(40)), "GUILD", "Old")
+    eq(#DB.chronicle, before + 1, "too old to keep")
+end)
+
+test("my own milestones are shared", function()
+    ADDONMSG = {}
+    FIRE("PLAYER_LEVEL_UP", 30)
+    FIRE("PLAYER_LEVEL_UP", 31)
+    assert(Sent("^M~Craig~%d+~level~WARRIOR~24~30~"), "level 30 not shared")
+    assert(not Sent("~31~"), "level 31 shared")
+    FIRE("CHAT_MSG_LOOT", "You receive loot: |cffa335ee|Hitem:1:|h[Gut Ripper]|h|r.")
+    assert(Sent("~loot~.*Gut Ripper"), "epic not shared")
+end)
+
+test("a first dungeon run is told on the way out", function()
+    ADDONMSG = {}
+    GetRealZoneText = function() return "Shadowfang Keep" end
+    IsInInstance = function() return true end
+    local name = UnitName
+    UnitName = function(u) if u == "party1" then return "Bob" end return name(u) end
+    FIRE("ZONE_CHANGED_NEW_AREA")
+    FIRE("ENCOUNTER_END", 77, "Arugal", 1, 5, 1)
+    assert(not Sent("~dungeon~"), "told before leaving")
+    IsInInstance = function() return false end
+    GetRealZoneText = function() return "Silverpine Forest" end
+    FIRE("ZONE_CHANGED_NEW_AREA")
+    assert(Sent("~dungeon~[^~]*~[^~]*~Shadowfang Keep~1~Bob$"), "first run not told: " .. table.concat(ADDONMSG, " / "))
+    UnitName = name
+    local n = #ADDONMSG
+    GetRealZoneText = function() return "Shadowfang Keep" end
+    IsInInstance = function() return true end
+    FIRE("ZONE_CHANGED_NEW_AREA")
+    NOWT = NOWT + 60
+    FIRE("ENCOUNTER_END", 78, "Rethilgore", 1, 5, 1)
+    IsInInstance = function() return false end
+    GetRealZoneText = function() return "Elwynn Forest" end
+    FIRE("ZONE_CHANGED_NEW_AREA")
+    eq(#ADDONMSG, n, "second run told again")
+end)
+
+test("a guildie logging in gets the news", function()
+    ADDONMSG = {}
+    NOWT = NOWT + 60
+    FIRE("CHAT_MSG_ADDON", "FTold1", "H~0", "GUILD", "Grim-Realm")
+    assert(Sent("^M~Craig~.*~level~"), "own news not sent")
+    assert(Sent("^M~Hild%-Realm~"), "guildie's news not relayed")
+end)
+
+test("sharing can be turned off", function()
+    DB.shareChronicle = false
+    ADDONMSG = {}
+    FIRE("PLAYER_LEVEL_UP", 40)
+    FIRE("CHAT_MSG_ADDON", "FTold1", "H~0", "GUILD", "Grim-Realm")
+    assert(not Sent("^M~"), "shared while off")
+    assert(Find(Rows("chronicle"), "You|r reached level 40"), "not kept locally")
+    DB.shareChronicle = true
+end)
+
+test("the chronicle page reads like a story", function()
+    local rows = Rows("chronicle")
+    assert(Find(rows, "^Today$"), "no day heading")
+    assert(Find(rows, "Hild|r reached level 40 in Stranglethorn Vale%."), "guildie's level")
+    assert(Find(rows, "ran Shadowfang Keep for the first time, with Bob%."), "dungeon run")
+    assert(Find(rows, "looted .*Gut Ripper"), "loot")
+    eq(NS.Pages.chronicle.badge(), "1", "badge counts guildies' news")
+    NS.PageView.chronicle = "loot"
+    rows = Rows("chronicle")
+    assert(not Find(rows, "reached level"), "levels under loot")
+    NS.PageView.chronicle = "all"
+end)
+
 -- Pages ---------------------------------------------------------------------------------
 
 test("every page opens", function()
-    for _, id in ipairs({ "journal", "fellowship", "deeds", "grudges", "bounties", "rivals", "wanted", "atlas", "stats", "settings" }) do
+    for _, id in ipairs({ "journal", "fellowship", "deeds", "grudges", "bounties", "rivals", "wanted", "chronicle", "guild", "atlas", "stats", "settings" }) do
         NS.Open(id)
         assert(ForeverToldFrame.title.text and ForeverToldFrame.title.text ~= "", "no title on " .. id)
     end

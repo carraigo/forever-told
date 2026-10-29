@@ -9,7 +9,9 @@
 --   $~name~gold~hunter                             I paid the hunter the reward I promised
 --   S~name~where                                   I just saw this wanted player here
 --
---   H                                              hello: please send me your bounties
+--   H~since                                        hello: please send me your bounties (and chronicle news)
+--
+-- Other features add their own kinds through ns.GuildHandlers and ns.GuildSend.
 
 local _, ns = ...
 local U = ns.U
@@ -33,6 +35,8 @@ local function Send(msg)
     local send = (C_ChatInfo and C_ChatInfo.SendAddonMessage) or SendAddonMessage
     if send then pcall(send, PREFIX, msg, "GUILD") end
 end
+ns.GuildSend = Send
+ns.GuildHandlers = {}
 
 -- The gold I've promised on my own wanted poster for this player.
 function ns.MyReward(name)
@@ -220,6 +224,7 @@ local function OnMessage(prefix, msg, channel, sender)
     local DB = ns.DB
     local f = Split(msg)
     local kind, name = f[1], f[2]
+    if ns.GuildHandlers[kind] then ns.GuildHandlers[kind](f, sender) end
     if kind == "H" then
         C_Timer.After(1 + math.random() * 4, SendAll)
     elseif kind == "P" and name and name ~= "" then
@@ -296,7 +301,7 @@ ns.On("PLAYER_ENTERING_WORLD", function()
     Expire()
     -- Guild info can take a few seconds to arrive after login.
     C_Timer.After(10, function()
-        Send("H")
+        Send("H~" .. (ns.ChronicleSince and ns.ChronicleSince() or 0))
         SendAll()
     end)
 end)
