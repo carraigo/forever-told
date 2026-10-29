@@ -71,6 +71,7 @@ end
 local function Mine(kind, a, b, c)
     local e = { who = me or UnitName("player"), t = time(), kind = kind, classFile = myClass, lvl = UnitLevel("player"), a = a, b = b, c = c }
     Store(e)
+    ns.DB.counters.chronicled = (ns.DB.counters.chronicled or 0) + 1
     if IsInGuild() then Share(e) end
 end
 ns.ChronicleMine = Mine

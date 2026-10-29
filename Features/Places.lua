@@ -57,3 +57,49 @@ function ns.TopZone(field)
     end
     return best, most
 end
+
+-- Continents the game can list zones for. Classic Era's two, then WoW Forever's.
+local KNOWN_CONTINENTS = { 1414, 1415, 12, 13, 101, 113, 424, 572, 619, 875, 876, 905, 1550, 1978, 2274 }
+
+-- Every zone on each continent, by continent name. Asked once per session.
+local continentZones
+function ns.ContinentZones()
+    if continentZones then return continentZones end
+    if not (C_Map and C_Map.GetMapInfo and C_Map.GetMapChildrenInfo) then return {} end
+    continentZones = {}
+    local zoneType = Enum and Enum.UIMapType and Enum.UIMapType.Zone or 3
+    local continentType = Enum and Enum.UIMapType and Enum.UIMapType.Continent or 2
+    local ids, seen = {}, {}
+    for id in pairs(ns.DB.continents) do ids[#ids + 1] = id end
+    for _, id in ipairs(KNOWN_CONTINENTS) do ids[#ids + 1] = id end
+    for _, id in ipairs(ids) do
+        local info = not seen[id] and C_Map.GetMapInfo(id)
+        seen[id] = true
+        if info and info.mapType == continentType and not continentZones[info.name] then
+            local names, set = {}, {}
+            for _, child in ipairs(C_Map.GetMapChildrenInfo(id, zoneType, false) or {}) do
+                if child.name and not set[child.name] then
+                    set[child.name] = true
+                    names[#names + 1] = child.name
+                end
+            end
+            if #names > 0 then
+                table.sort(names)
+                continentZones[info.name] = names
+            end
+        end
+    end
+    -- The map may not be ready this early; ask again next time.
+    local zones = continentZones
+    if not next(zones) then continentZones = nil end
+    return zones
+end
+
+-- How much of one continent you've explored: zones found, zones on the map.
+function ns.ContinentProgress(name)
+    local zones = ns.ContinentZones()[name]
+    if not zones then return 0, 0 end
+    local found = 0
+    for _, zone in ipairs(zones) do if ns.DB.zones[zone] then found = found + 1 end end
+    return found, #zones
+end

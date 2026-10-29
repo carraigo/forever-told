@@ -84,7 +84,7 @@ local function Tiles(list)
 end
 
 ns.Pages.chronicle = {
-    title = "Chronicle", icon = "Interface\\Icons\\INV_Scroll_03",
+    title = "Guild Chronicles", icon = "Interface\\Icons\\INV_Scroll_03",
     subtitle = function()
         local guild = IsInGuild() and GetGuildInfo("player")
         return guild and ("<%s> · the guild's story so far"):format(guild) or "The guild's story so far"
