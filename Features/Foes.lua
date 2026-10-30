@@ -116,9 +116,13 @@ function ns.FoeSlain(name)
     z.kills = (z.kills or 0) + 1
     ns.Bump("kills")
     local score, level, class = Toughness(name)
+    if class and class ~= "normal" and class ~= "rare" and level >= UnitLevel("player") + 3 then
+        DB.counters.giants = (DB.counters.giants or 0) + 1
+    end
     if score and (not DB.toughest or score > (DB.toughest.score or 0)) then
         DB.toughest = { name = name, level = level, class = class ~= "normal" and class or nil, score = score, t = time(), zone = zone }
     end
+    if ns.CheckDeeds then ns.CheckDeeds() end
 end
 
 local function OnXP(msg)

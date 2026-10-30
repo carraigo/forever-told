@@ -25,6 +25,8 @@ local C = S.colours
 local LATIN = { enUS = true, enGB = true, deDE = true, frFR = true, esES = true, esMX = true, itIT = true, ptBR = true }
 S.BODY = LATIN[GetLocale and GetLocale() or "enUS"] and "Fonts\\ARIALN.TTF" or STANDARD_TEXT_FONT
 S.TITLE = STANDARD_TEXT_FONT
+-- The carved lettering on epitaph stones.
+S.CARVED = LATIN[GetLocale and GetLocale() or "enUS"] and "Fonts\\MORPHEUS.TTF" or STANDARD_TEXT_FONT
 
 function S.Fill(frame, colour, layer)
     local t = frame:CreateTexture(nil, layer or "BACKGROUND")
@@ -356,6 +358,7 @@ function S.List(parent)
         r.bar = r:CreateTexture(nil, "OVERLAY")
         r.bar:SetColorTexture(unpack(C.accent))
         r.tiles = {}
+        r.stones = {}
         r:SetScript("OnEnter", function(self)
             local item = self.item
             if not item then return end
@@ -379,6 +382,7 @@ function S.List(parent)
         end
         r.bg:SetColorTexture(0, 0, 0, 0)
         for _, t in ipairs(r.tiles) do t:Hide() end
+        for _, t in ipairs(r.stones) do t:Hide() end
         r.item = nil
         r:EnableMouse(false)
     end
@@ -408,6 +412,62 @@ function S.List(parent)
         end
     end
 
+    -- Small epitaph stones, side by side; click one for the full stone.
+    local STONE, INK = { 0.33, 0.33, 0.35, 1 }, { 0.86, 0.84, 0.78, 1 }
+    local function Carve(parent, size, font, alpha)
+        local fs = S.Text(parent, size, { INK[1], INK[2], INK[3], alpha or 1 }, font or S.CARVED)
+        fs:SetJustifyH("CENTER")
+        fs:SetWidth(130)
+        if fs.SetShadowColor then
+            fs:SetShadowColor(0, 0, 0, 0.9)
+            fs:SetShadowOffset(1, -1)
+        end
+        return fs
+    end
+    local function Stones(r, stones)
+        for i, info in ipairs(stones) do
+            local t = r.stones[i]
+            if not t then
+                t = CreateFrame("Button", nil, r)
+                t:SetSize(150, 200)
+                S.Fill(t, STONE)
+                S.Border(t, { 0.18, 0.18, 0.19, 1 })
+                local inner = CreateFrame("Frame", nil, t)
+                inner:SetPoint("TOPLEFT", 8, -8)
+                inner:SetPoint("BOTTOMRIGHT", -8, 8)
+                S.Border(inner, { 0.86, 0.84, 0.78, 0.35 })
+                t.kicker = Carve(t, 10)
+                t.kicker:SetPoint("TOP", 0, -22)
+                t.kicker:SetText("HERE LIES")
+                t.skull = t:CreateTexture(nil, "ARTWORK")
+                t.skull:SetSize(18, 18)
+                t.skull:SetTexture("Interface\\TargetingFrame\\UI-TargetingFrame-Skull")
+                t.skull:SetVertexColor(unpack(INK))
+                t.skull:SetPoint("TOP", t.kicker, "BOTTOM", 0, -6)
+                t.name = Carve(t, 17)
+                t.name:SetPoint("TOP", t.skull, "BOTTOM", 0, -6)
+                t.who = Carve(t, 10, STANDARD_TEXT_FONT, 0.85)
+                t.who:SetPoint("TOP", t.name, "BOTTOM", 0, -4)
+                t.fell = Carve(t, 11)
+                t.fell:SetPoint("TOP", t.who, "BOTTOM", 0, -12)
+                t.date = Carve(t, 9, STANDARD_TEXT_FONT, 0.6)
+                t.date:SetPoint("BOTTOM", 0, 22)
+                t:SetScript("OnClick", function(self) if self.info and self.info.onClick then self.info.onClick() end end)
+                t:SetScript("OnEnter", function(self) if self.info and self.info.tip then S.ShowTip(self, self.info.tip.title, self.info.tip.lines) end end)
+                t:SetScript("OnLeave", function() S.HideTip() end)
+                r.stones[i] = t
+            end
+            t.info = info
+            t:ClearAllPoints()
+            t:SetPoint("TOPLEFT", (i - 1) * 162, -4)
+            t.name:SetText(info.name)
+            t.who:SetText(info.who)
+            t.fell:SetText(info.fell)
+            t.date:SetText(info.date)
+            t:Show()
+        end
+    end
+
     function sf:SetItems(items)
         used = 0
         local width = math.max(200, (sf:GetWidth() or 560) - 12)
@@ -433,6 +493,9 @@ function S.List(parent)
             elseif item.type == "tiles" then
                 Tiles(r, item.tiles, width)
                 h = 70
+            elseif item.type == "stones" then
+                Stones(r, item.stones)
+                h = 212
             elseif item.type == "header" then
                 r.text:SetFont(S.TITLE, 13, "")
                 r.text:SetTextColor(unpack(C.accent))

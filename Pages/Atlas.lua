@@ -10,40 +10,6 @@ local DUNGEONS = "Dungeons and raids"
 local VISITED, DUNGEON, BOSS = Hex("8fd18f"), Hex("7fb2ff"), Hex("ff9a62")
 local UNSEEN = { 1, 1, 1, 0.3 }
 
--- Continents the game can list zones for. Classic Era's two, then WoW Forever's.
-local KNOWN_CONTINENTS = { 1414, 1415, 12, 13, 101, 113, 424, 572, 619, 875, 876, 905, 1550, 1978, 2274 }
-
--- Every zone on each continent, by continent name. Asked once per session.
-local continentZones
-local function ContinentZones()
-    if continentZones then return continentZones end
-    continentZones = {}
-    if not (C_Map and C_Map.GetMapInfo and C_Map.GetMapChildrenInfo) then return continentZones end
-    local zoneType = Enum and Enum.UIMapType and Enum.UIMapType.Zone or 3
-    local continentType = Enum and Enum.UIMapType and Enum.UIMapType.Continent or 2
-    local ids, seen = {}, {}
-    for id in pairs(ns.DB.continents) do ids[#ids + 1] = id end
-    for _, id in ipairs(KNOWN_CONTINENTS) do ids[#ids + 1] = id end
-    for _, id in ipairs(ids) do
-        local info = not seen[id] and C_Map.GetMapInfo(id)
-        seen[id] = true
-        if info and info.mapType == continentType and not continentZones[info.name] then
-            local names, set = {}, {}
-            for _, child in ipairs(C_Map.GetMapChildrenInfo(id, zoneType, false) or {}) do
-                if child.name and not set[child.name] then
-                    set[child.name] = true
-                    names[#names + 1] = child.name
-                end
-            end
-            if #names > 0 then
-                table.sort(names)
-                continentZones[info.name] = names
-            end
-        end
-    end
-    return continentZones
-end
-
 -- The zone's story, for its hover card.
 local function StoryLines(zone, info)
     local s = ns.ZoneStory(zone)
@@ -88,7 +54,7 @@ ns.Pages.atlas = {
     items = function()
         local DB = ns.DB
         if Count(DB.zones) == 0 then return Empty("Nowhere yet. Step outside!") end
-        local all = ContinentZones()
+        local all = ns.ContinentZones()
         -- Places from before continents were recorded go wherever the map puts them.
         local home = {}
         for continent, zones in pairs(all) do

@@ -74,6 +74,34 @@ local function WorstGrudge()
 end
 
 local function C(name) return ns.DB.counters[name] or 0 end
+
+local function FoesSlain() return (ns.FoeTotals()) end
+local function FoeKinds() return select(2, ns.FoeTotals()) end
+
+-- Kills of the monster that has killed you most (players and falls don't count).
+local function TablesTurned()
+    local best, n = nil, 0
+    for _, e in ipairs(ns.DeadliestFoes()) do
+        if not e.f.player and not e.f.env then best = e.f break end
+    end
+    if best then n = best.kills end
+    return n
+end
+
+local function LongestStay()
+    local most = 0
+    for zone in pairs(ns.DB.zones) do most = math.max(most, ns.ZoneStory(zone).time) end
+    return math.floor(most / 3600)
+end
+
+local function Explored(continent)
+    return function() return (ns.ContinentProgress(continent)) end,
+        function() return select(2, ns.ContinentProgress(continent)) end
+end
+local EK, EK_ALL = Explored("Eastern Kingdoms")
+local KAL, KAL_ALL = Explored("Kalimdor")
+
+local function Heroes() return ns.Heroes and #ns.Heroes() or 1 end
 local function Killed(name) return ns.DB.counters.kills and ns.DB.counters.kills[name] and 1 or 0 end
 
 -- { id, name, description, progress function, goal }
@@ -116,12 +144,33 @@ ns.DEEDS = {
     { "avenged", "Not Alone", "Have a guildie avenge you through the bounty board.", function() return GrudgeSum("avenged") end, 1 },
     { "hunter1", "Bounty Hunter", "Collect a guild bounty.", function() return C("bounties") end, 1 },
     { "hunter10", "Guild Enforcer", "Collect 10 guild bounties.", function() return C("bounties") end, 10 },
+    -- Version 1.1, from the foes, places and chronicle that 1.0 started keeping.
+    { "slain1000", "Thousand Cuts", "Slay 1,000 foes.", FoesSlain, 1000 },
+    { "slain10000", "Ten Thousand Cuts", "Slay 10,000 foes.", FoesSlain, 10000 },
+    { "bestiary", "Bestiary", "Slay 100 different kinds of foe.", FoeKinds, 100 },
+    { "tables", "Tables Turned", "Slay 25 of the foe that has killed you most.", TablesTurned, 25 },
+    { "giant", "Giant Slayer", "Finish an elite 3 or more levels above you.", function() return C("giants") end, 1 },
+    { "ekexplorer", "Eastern Kingdoms Explorer", "Explore every zone in the Eastern Kingdoms.", EK, EK_ALL },
+    { "kalexplorer", "Kalimdor Explorer", "Explore every zone in Kalimdor.", KAL, KAL_ALL },
+    { "homebody", "Homebody", "Spend 10 hours in one zone.", LongestStay, 10 },
+    { "chronicled", "In the Chronicles", "Appear in the Guild Chronicles 10 times.", function() return C("chronicled") end, 10 },
+    { "heroes", "Heroes All", "Write the story of 3 characters in the Hall of Heroes.", Heroes, 3 },
 }
 
+-- The goal is a number, or a function when it depends on the map.
+function ns.DeedGoal(deed)
+    if type(deed[5]) ~= "function" then return deed[5] end
+    local ok, goal = pcall(deed[5])
+    goal = ok and tonumber(goal) or 0
+    return goal > 0 and goal or nil
+end
+
 function ns.DeedProgress(deed)
+    local goal = ns.DeedGoal(deed)
+    if not goal then return 0, 1, true end -- not knowable yet
     local ok, value = pcall(deed[4])
     value = ok and tonumber(value) or 0
-    return math.min(value, deed[5]), deed[5]
+    return math.min(value, goal), goal
 end
 
 local checking = false
@@ -134,8 +183,8 @@ function ns.CheckDeeds(silent)
     for _, deed in ipairs(ns.DEEDS) do
         local id = deed[1]
         if not DB.deeds[id] then
-            local value, goal = ns.DeedProgress(deed)
-            if value >= goal then
+            local value, goal, unknown = ns.DeedProgress(deed)
+            if not unknown and value >= goal then
                 DB.deeds[id] = { t = time(), lvl = UnitLevel("player"), earlier = silent or nil }
                 if not silent then
                     ns.Bump("deeds")
@@ -194,6 +243,7 @@ ns.On("PLAYER_ENTERING_WORLD", function()
         end
         wasOnTaxi = onTaxi
     end)
-    ns.CheckDeeds(not ns.DB.deedsSeeded)
-    ns.DB.deedsSeeded = true
+    -- New deeds a character already qualifies for are granted quietly, not as a burst of toasts.
+    ns.CheckDeeds(not ns.DB.deedsSeeded or not ns.DB.deedsSeeded11)
+    ns.DB.deedsSeeded, ns.DB.deedsSeeded11 = true, true
 end)

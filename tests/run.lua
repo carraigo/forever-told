@@ -446,6 +446,7 @@ end)
 test("the chronicle page reads like a story", function()
     local rows = Rows("chronicle")
     assert(Find(rows, "^Today$"), "no day heading")
+    eq(NS.Pages.chronicle.title, "Guild Chronicles", "menu name")
     assert(Find(rows, "Hild|r reached level 40 in Stranglethorn Vale%."), "guildie's level")
     assert(Find(rows, "ran Shadowfang Keep for the first time, with Bob%."), "dungeon run")
     assert(Find(rows, "looted .*Gut Ripper"), "loot")
@@ -456,10 +457,69 @@ test("the chronicle page reads like a story", function()
     NS.PageView.chronicle = "all"
 end)
 
+-- Hall of Heroes ----------------------------------------------------------------------
+
+test("each character writes its line in the hall", function()
+    local h = ForeverToldAccountDB.heroes["Craig-Stormrage"]
+    assert(h, "no hall entry")
+    eq(h.level, 24, "level")
+    eq(h.classFile, "WARRIOR", "class")
+    ForeverToldAccountDB.heroes["Frostbyte-Stormrage"] = { name = "Frostbyte", realm = "Stormrage", level = 47, class = "Mage",
+        classFile = "MAGE", race = "Gnome", quests = 512, deeds = 21, t = time() - DAY(2), played = 3600 * 30 }
+    ForeverToldAccountDB.heroes["Brunhild-Stormrage"] = { name = "Brunhild", realm = "Stormrage", level = 34, t = time() - DAY(9),
+        epitaph = { name = "Brunhild", lvl = 34, race = "Dwarf", class = "Paladin", zone = "Desolace", cause = "Hulking Gritjaw", t = time() - DAY(9) } }
+    local rows = Rows("heroes")
+    assert(Find(rows, "^Still on the road$"), "no living section")
+    -- Craig fell on Hardcore earlier in these tests, so he's a stone now.
+    assert(Find(rows, "^Frostbyte$"), "other character missing")
+    local stones
+    for _, r in ipairs(rows) do if r.type == "stones" then stones = r.stones end end
+    eq(stones and #stones, 2, "stones")
+    local brunhild
+    for _, st in ipairs(stones) do if st.name == "BRUNHILD" then brunhild = st end end
+    assert(brunhild and brunhild.fell:find("Desolace"), "Brunhild's stone")
+    brunhild.onClick()
+    eq(ForeverToldEpitaph.name.text, "BRUNHILD", "full stone opens")
+    eq(ForeverToldEpitaph.kicker.text, "HERE LIES", "a real epitaph, not a preview")
+    eq(Find(rows, "^Characters$").text, "3", "character count")
+end)
+
+test("a character can be removed from the hall, but not yourself", function()
+    IsShiftKeyDown = function() return true end
+    Find(Rows("heroes"), "^Frostbyte$").onClick()
+    eq(ForeverToldAccountDB.heroes["Frostbyte-Stormrage"], nil, "not removed")
+    NS.ForgetHero("Craig-Stormrage")
+    assert(ForeverToldAccountDB.heroes["Craig-Stormrage"], "removed yourself")
+    IsShiftKeyDown = function() return false end
+end)
+
+-- New deeds -----------------------------------------------------------------------------
+
+test("the new deeds read what 1.0 keeps", function()
+    eq(#NS.DEEDS, 45, "deed count")
+    assert(DB.deeds.giant, "Mor'Ladim was an elite 6 levels up")
+    assert(not DB.deeds.slain1000, "1,000 kills too early")
+    DB.foes["Defias Bandit"].kills = 1000
+    NS.CheckDeeds()
+    assert(DB.deeds.slain1000, "Thousand Cuts")
+    local ek
+    for _, d in ipairs(NS.DEEDS) do if d[1] == "ekexplorer" then ek = d end end
+    local value, goal = NS.DeedProgress(ek)
+    eq(goal, 4, "zones on the map")
+    eq(value, 2, "zones explored")
+    DB.zones.Westfall = { t = time() }
+    DB.zones["Redridge Mountains"] = { t = time() }
+    NS.CheckDeeds()
+    assert(DB.deeds.ekexplorer, "Eastern Kingdoms Explorer")
+    eq(DB.deeds.kalexplorer, nil, "Kalimdor isn't on the map, so it can't be earned")
+    assert((DB.counters.chronicled or 0) >= 3, "chronicle appearances counted")
+    eq(DB.deeds.heroes, nil, "only 2 heroes left")
+end)
+
 -- Pages ---------------------------------------------------------------------------------
 
 test("every page opens", function()
-    for _, id in ipairs({ "journal", "fellowship", "deeds", "grudges", "bounties", "rivals", "wanted", "chronicle", "guild", "atlas", "stats", "settings" }) do
+    for _, id in ipairs({ "journal", "fellowship", "deeds", "grudges", "bounties", "rivals", "wanted", "chronicle", "guild", "atlas", "stats", "heroes", "hall", "settings" }) do
         NS.Open(id)
         assert(ForeverToldFrame.title.text and ForeverToldFrame.title.text ~= "", "no title on " .. id)
     end

@@ -1,3 +1,12 @@
+## v1.1
+
+**New**
+- Hall of Heroes: a new page listing every character you've played with Forever Told, with their level, chapter, zone, quests, deeds and time played, plus totals for your whole account. Fallen Hardcore characters keep their epitaph stone here, and clicking one shows it in full. Shift-click a character to remove it. `/told heroes` opens it.
+- Ten new deeds (45 in all): Thousand Cuts, Ten Thousand Cuts, Bestiary, Tables Turned, Giant Slayer, Eastern Kingdoms Explorer, Kalimdor Explorer, Homebody, In the Chronicles and Heroes All. Any you've already earned are granted quietly on your first login.
+
+**Changes**
+- The Chronicle page is now called Guild Chronicles.
+
 ## v1.0
 
 **New**

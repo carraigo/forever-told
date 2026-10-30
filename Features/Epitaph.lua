@@ -146,9 +146,10 @@ local function Fill(e, preview)
     f.closing:SetText(CLOSINGS[n % #CLOSINGS + 1])
 end
 
-function ns.ShowEpitaph()
+-- This character's stone (or how it would read today), or another fallen hero's.
+function ns.ShowEpitaph(other)
     if not stone then CreateStone() end
-    local e = ns.DB.epitaph
+    local e = other or ns.DB.epitaph
     Fill(e or Summary(nil), not e)
     stone:Show()
 end

@@ -27,7 +27,7 @@ Everyone you've grouped with is remembered: when and where you first met, and ho
 
 ## 🏅 Deeds
 
-35 home-made, vanilla-flavoured badges, from *Hogger Hunter* and *Saddle Up* to *Eastern Kingdoms Delver*, *Survivor* (level 20 without dying), *Sweet Revenge* and *Guild Enforcer*. Progress bars show how close you are to each one.
+45 home-made, vanilla-flavoured badges, from *Hogger Hunter* and *Saddle Up* to *Eastern Kingdoms Explorer*, *Thousand Cuts*, *Giant Slayer*, *Survivor* (level 20 without dying), *Sweet Revenge* and *Guild Enforcer*. Progress bars show how close you are to each one.
 
 ## ⚔️ Grudges & Revenge
 
@@ -51,7 +51,11 @@ Everyone you've grouped with is remembered: when and where you first met, and ho
 - **Witness reports:** spot a wanted player and your guild sees *"last seen in Tarren Mill, 3 minutes ago by Bob."*
 - **Rewards:** addons can't move gold, so rewards are promises. The poster tracks who owes whom, and the person who posted it marks it paid once they've traded or mailed the gold.
 
-## 📖 Guild Chronicle
+## 🏛️ Hall of Heroes
+
+Every character you play with Forever Told gets a line in the hall: level, chapter, where they are, quests, deeds and time played, with the whole account's totals on top. Fallen **Hardcore** characters keep their epitaph stone here; click one to read it in full.
+
+## 📖 Guild Chronicles
 
 A page with one feed for the whole guild. Guildies running Forever Told share their big moments, grouped by day:
 
@@ -93,7 +97,7 @@ A flat, dark window with sidebar navigation, card-style lists, hover details and
 |---|---|
 | `/told` | Open or close the journal (or click the minimap book) |
 | `/told grudges` · `bounties` · `wanted` · `rivals` | Jump to a Grudges view |
-| `/told fellowship` · `deeds` · `chronicle` · `atlas` · `stats` · `settings` | Open a page |
+| `/told fellowship` · `deeds` · `chronicle` · `atlas` · `stats` · `heroes` · `settings` | Open a page |
 | `/told note <text>` | Add your own line to the journal |
 | `/told recent` | Print the last ten entries to chat |
 | `/told export` · `import` | Back up your story, or bring one back |
@@ -108,14 +112,14 @@ A flat, dark window with sidebar navigation, card-style lists, hover details and
 - **Foes slain** are counted from the "dies, you gain experience" message, so grey enemies that give no experience aren't counted.
 - **Guild features** only work with guildies who also run Forever Told. Bounty sharing, witness reports and the chronicle can be turned off in Settings.
 - **Time per level** asks the game for `/played` once per login, so you'll see that line in chat once. You can turn it off.
-- All data is saved **per character**.
+- Journals are saved **per character**. The Hall of Heroes is shared across your account, and a character joins it the first time you log in on it with v1.1.
 
 ## Project layout
 
 | Folder | What's in it |
 |---|---|
 | `Core` | Saved data, upgrades, settings, slash commands and the journal itself |
-| `Features` | What the addon tracks: fellowship, deeds, recaps, grudges, places, foes, bounties, the guild chronicle, backups and the epitaph |
+| `Features` | What the addon tracks: fellowship, deeds, recaps, grudges, places, foes, bounties, the guild chronicle, backups, the epitaph and the Hall of Heroes |
 | `UI` | The widget kit, main window, pop-ups, minimap button and wanted posters |
 | `Pages` | One file per page of the journal window |
 | `tests` | Automated tests (not shipped in the addon) |
