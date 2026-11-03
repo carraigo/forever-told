@@ -1,3 +1,11 @@
+## v1.1.1
+
+**Fixes**
+- Hall of Heroes: the page no longer shows a Lua error when a character in the hall has no zone saved.
+
+**Under the hood**
+- The automated tests now run on Lua 5.1, the version the game uses, as well as 5.4.
+
 ## v1.1
 
 **New**
