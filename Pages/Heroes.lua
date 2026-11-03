@@ -28,7 +28,7 @@ local function Living(e, me)
     local h = e.h
     local colour = ClassColour(h.classFile)
     local chapter = ChapterTitle(ns.ChapterOf(h.level or 1)):gsub("^Chapter (%d+) · ", "Chapter %1, ")
-    local bits = { ("%s %s"):format(h.race or "", h.class or ""):gsub("^ ", ""), chapter, h.zone,
+    local bits = { ("%s %s"):format(h.race or "", h.class or ""):gsub("^ ", ""), chapter, h.zone or "somewhere unknown",
         ("%s, %s"):format(Plural(h.quests or 0, "quest"), Plural(h.deeds or 0, "deed")) }
     local realm = h.realm and h.realm ~= GetRealmName() and (" · " .. h.realm) or ""
     return {
