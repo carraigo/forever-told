@@ -74,6 +74,9 @@ ForeverToldDB = {
 }
 
 LoadAddon()
+-- Note which events the addon signs up for.
+REGISTERED = {}
+for _, f in ipairs(FRAMES) do f.RegisterEvent = function(_, e) REGISTERED[e] = true end end
 FIRE("ADDON_LOADED", "ForeverTold")
 FIRE("PLAYER_ENTERING_WORLD", true, false)
 local DB = ForeverToldDB
@@ -514,6 +517,13 @@ test("the new deeds read what 1.0 keeps", function()
     eq(DB.deeds.kalexplorer, nil, "Kalimdor isn't on the map, so it can't be earned")
     assert((DB.counters.chronicled or 0) >= 3, "chronicle appearances counted")
     eq(DB.deeds.heroes, nil, "only 2 heroes left")
+end)
+
+-- Events ----------------------------------------------------------------------------------
+
+test("the combat log isn't requested on WoW Forever", function()
+    assert(REGISTERED.PLAYER_DEAD, "normal events not registered")
+    eq(REGISTERED.COMBAT_LOG_EVENT_UNFILTERED, nil, "combat log registered on WoW Forever")
 end)
 
 -- Pages ---------------------------------------------------------------------------------
