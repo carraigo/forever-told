@@ -1,3 +1,8 @@
+## v1.1.2
+
+**Fixes**
+- WoW Forever: no more "blocked functionality" (Ignore / Disable) popup at login. Forever Told no longer asks for the combat log there, since WoW Forever doesn't share it with addons. Classic Era still uses it.
+
 ## v1.1.1
 
 **Fixes**

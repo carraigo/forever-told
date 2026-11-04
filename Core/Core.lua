@@ -373,7 +373,13 @@ frame:SetScript("OnEvent", function(self, event, ...)
         if ... ~= ADDON then return end
         InitDB()
         for name, fn in pairs(handlers) do ns.On(name, fn) end
-        for name in pairs(ns.listeners) do pcall(self.RegisterEvent, self, name) end
+        for name in pairs(ns.listeners) do
+            -- WoW Forever closes the combat log to addons: even asking for it
+            -- raises the "blocked functionality" popup, so only Classic Era does.
+            if name ~= "COMBAT_LOG_EVENT_UNFILTERED" or not issecretvalue then
+                pcall(self.RegisterEvent, self, name)
+            end
+        end
         if ns.CreateMinimapButton then ns.CreateMinimapButton() end
         self:UnregisterEvent("ADDON_LOADED")
         return
