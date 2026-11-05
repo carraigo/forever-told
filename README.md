@@ -102,6 +102,7 @@ A flat, dark window with sidebar navigation, card-style lists, hover details and
 | `/told recent` | Print the last ten entries to chat |
 | `/told export` · `import` | Back up your story, or bring one back |
 | `/told epitaph` | Show the Hardcore memorial stone |
+| `/told guild` | Say hello to your guild and check the guild channel: who else runs Forever Told, messages sent and heard |
 | `/told alerts` · `bounty` · `milestones` · `shots` · `banner` · `time` · `rare` · `minimap` | Turn a setting on or off |
 
 `/forevertold` works too.

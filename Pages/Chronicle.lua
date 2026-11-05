@@ -76,6 +76,11 @@ local function Tiles(list)
         if (e.lvl or 0) >= 60 or (e.kind == "level" and tonumber(e.a) == 60) then sixty[who] = true end
         if time() - e.t < WEEK then week = week + 1 end
     end
+    -- Guildies we've heard from count too, even before their first milestone.
+    for _, g in ipairs(ns.Guildies and ns.Guildies() or {}) do
+        authors[g.name] = true
+        if (g.level or 0) >= 60 then sixty[g.name] = true end
+    end
     return { type = "tiles", tiles = {
         { label = "Guildies keeping a journal", value = tostring(U.Count(authors)) },
         { label = "At level 60", value = tostring(U.Count(sixty)), colour = C.accent },
@@ -111,6 +116,20 @@ ns.Pages.chronicle = {
             return Empty("Join a guild to read its chronicle. Guildies running Forever Told share their big moments here: every 10th level, epic loot, first dungeon runs, deeds and Hardcore deaths.")
         end
         local items = { Tiles(list) }
+        -- Who else in the guild runs Forever Told, so you can see sharing works
+        -- before anyone has a milestone to tell.
+        local keepers = {}
+        for _, g in ipairs(ns.Guildies and ns.Guildies() or {}) do
+            local colour = ClassColour(g.classFile)
+            keepers[#keepers + 1] = ("|cff%02x%02x%02x%s|r%s"):format(math.floor(colour[1] * 255), math.floor(colour[2] * 255),
+                math.floor(colour[3] * 255), g.name, g.level and (" " .. g.level) or "")
+        end
+        if #keepers > 0 then
+            items[#items + 1] = { text = "Also keeping a journal: " .. table.concat(keepers, ", "),
+                sub = "Heard from in the last 30 days. Their milestones show up here as they happen." }
+        elseif IsInGuild() then
+            items[#items + 1] = { type = "empty", text = "No guildies running Forever Told heard from yet. Type /told guild to say hello and check." }
+        end
         local day, shown = nil, 0
         for i = #list, 1, -1 do
             local e = list[i]

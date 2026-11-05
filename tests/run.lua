@@ -436,6 +436,42 @@ test("a guildie logging in gets the news", function()
     assert(Sent("^M~Hild%-Realm~"), "guildie's news not relayed")
 end)
 
+test("a guildie with no milestones yet still shows up", function()
+    ADDONMSG = {}
+    FIRE("CHAT_MSG_ADDON", "FTold1", "H~0~PRIEST~7", "GUILD", "Mira-Realm")
+    local found
+    for _, g in ipairs(NS.Guildies()) do if g.name == "Mira" then found = g end end
+    assert(found and found.level == 7 and found.classFile == "PRIEST", "hello didn't add Mira")
+    assert(Sent("^I~WARRIOR~24$"), "didn't answer the hello: " .. table.concat(ADDONMSG, " / "))
+    FIRE("CHAT_MSG_ADDON", "FTold1", "I~SHAMAN~5", "GUILD", "Tok-Realm")
+    assert(Find(Rows("chronicle"), "Also keeping a journal: .*Tok.*Mira"), "keepers not listed")
+end)
+
+test("a hello asks for news since I was last online, not since my newest entry", function()
+    DB.lastOnline = nil
+    eq(NS.ChronicleSince(), 0, "first login asks for everything")
+    FIRE("PLAYER_LOGOUT")
+    assert(DB.lastOnline and NS.ChronicleSince() == DB.lastOnline - 3600, "logout time not used")
+end)
+
+test("a burst of messages is paced, not dropped", function()
+    ADDONMSG = {}
+    for i = 1, 20 do NS.GuildSend("X~" .. i) end
+    eq(#ADDONMSG, 20, "all sent in the end")
+    eq(ADDONMSG[20], "X~20", "kept in order")
+end)
+
+test("/told guild reports the channel", function()
+    local out = {}
+    local p = print
+    print = function(m) out[#out + 1] = m end
+    SlashCmdList.FOREVERTOLD("guild")
+    print = p
+    local all = table.concat(out, "\n")
+    assert(all:find("Guild channel: open"), all)
+    assert(all:find("Mira %(7%)"), all)
+end)
+
 test("sharing can be turned off", function()
     DB.shareChronicle = false
     ADDONMSG = {}

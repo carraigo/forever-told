@@ -87,10 +87,12 @@ ns.GuildHandlers.M = function(f)
     Store(e)
 end
 
--- The newest thing I know about, so guildies only send what I missed.
+-- When I was last here, so guildies only send what I missed. (Not my newest
+-- entry: my own milestone from yesterday would hide a guildie's from last week.)
+-- An hour's overlap covers anything that was in flight; repeats are ignored.
 function ns.ChronicleSince()
-    local list = ns.DB.chronicle
-    return list[#list] and list[#list].t or 0
+    local last = ns.DB.lastOnline
+    return last and math.max(0, last - 3600) or 0
 end
 
 ns.GuildHandlers.H = function(f)
@@ -180,3 +182,4 @@ ns.On("PLAYER_ENTERING_WORLD", function()
     CheckRun()
 end)
 ns.On("ZONE_CHANGED_NEW_AREA", CheckRun)
+ns.On("PLAYER_LOGOUT", function() if ns.DB then ns.DB.lastOnline = time() end end)

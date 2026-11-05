@@ -1,3 +1,14 @@
+## v1.1.3
+
+**Fixes**
+- Guild Chronicles: guildies running Forever Told now show up as soon as they log in, not only once they've had a milestone. The page lists who else keeps a journal, with their level, and counts them in "Guildies keeping a journal".
+- Guild Chronicles: logging in now catches up on everything guildies did while you were away. Before, your own newest milestone hid any of theirs from before it.
+- Guild messages are paced to about one a second after a short burst, so the game no longer drops them when a guildie logs in and everyone replies at once.
+- If the game hasn't said you're in a guild yet 10 seconds after login, Forever Told tries again instead of staying quiet all session.
+
+**New**
+- `/told guild` says hello to your guild and shows whether the guild channel is working: messages sent and heard, and which guildies run Forever Told.
+
 ## v1.1.2
 
 **Fixes**
