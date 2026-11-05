@@ -281,7 +281,7 @@ end
 
 local TABLES = { "entries", "zones", "goldMarks", "bosses", "skills", "levelTimes", "deathZones", "fellows",
     "deeds", "counters", "recaps", "grudges", "bounties", "gankHours", "window", "posters", "debts",
-    "foes", "zoneStats", "continents", "chronicle", "chronicled" }
+    "foes", "zoneStats", "continents", "chronicle", "chronicled", "guildies" }
 local VALUES = { quests = 0, deaths = 0, shots = 0, epics = 0, goldPeak = 0, lootQuality = 4 }
 
 -- Upgrades to saved data. DB.version counts how many have run, so each one
@@ -444,6 +444,9 @@ SlashCmdList.FOREVERTOLD = function(msg)
         return
     elseif cmd == "epitaph" and ns.ShowEpitaph then
         ns.ShowEpitaph()
+        return
+    elseif cmd == "guild" and ns.GuildReport then
+        ns.GuildReport()
         return
     elseif (cmd == "export" or cmd == "import") and ns.ShowTransfer then
         ns.ShowTransfer(cmd)

@@ -9,7 +9,8 @@
 --   $~name~gold~hunter                             I paid the hunter the reward I promised
 --   S~name~where                                   I just saw this wanted player here
 --
---   H~since                                        hello: please send me your bounties (and chronicle news)
+--   H~since~classFile~level                        hello: please send me your bounties (and chronicle news)
+--   I~classFile~level                              reply to a hello: I run Forever Told too
 --
 -- Other features add their own kinds through ns.GuildHandlers and ns.GuildSend.
 
@@ -25,18 +26,95 @@ local SYNC_LIMIT = 15
 local SIGHT_COOLDOWN = 120      -- report the same player at most every two minutes
 local SPOTTED_TOAST = 600       -- and tell me about my own nemesis at most every ten
 
+local BURST, QUEUE_MAX = 8, 60  -- the game drops addon messages sent faster than about one a second
+local GUILDIE_KEEP = 30 * 86400
+
 local me
 local claimed, sighted, spottedToast = {}, {}, {}
 
+-- What /told guild reports: is the channel working, and who have we heard from.
+local stats = { sent = 0, failed = 0, heard = 0 }
+ns.GuildStats = stats
+
 -- Sending ------------------------------------------------------------------------------
+-- Messages go out through a small queue: a burst of a few, then one a second,
+-- so a login reply with a dozen bounties and chronicle entries isn't dropped.
+
+-- Older clients return true/false, newer ones a result code where 0 is success.
+local function Succeeded(ok, result)
+    return ok and (result == nil or result == true or result == 0)
+end
+
+local function RawSend(msg)
+    local send = (C_ChatInfo and C_ChatInfo.SendAddonMessage) or SendAddonMessage
+    if not send then return end
+    local ok, result = pcall(send, PREFIX, msg, "GUILD")
+    if Succeeded(ok, result) then
+        stats.sent = stats.sent + 1
+    else
+        stats.failed = stats.failed + 1
+        stats.lastError = ok and tostring(result) or "error"
+    end
+end
+
+local queue, tokens, lastRefill, waiting = {}, BURST, nil, false
+local function Pump()
+    local now = GetTime()
+    if lastRefill then tokens = math.min(BURST, tokens + (now - lastRefill)) end
+    lastRefill = now
+    while #queue > 0 and tokens >= 1 do
+        tokens = tokens - 1
+        RawSend(table.remove(queue, 1))
+    end
+    if #queue > 0 and not waiting then
+        waiting = true
+        C_Timer.After(1, function()
+            waiting = false
+            tokens = math.max(tokens, 1)
+            Pump()
+        end)
+    end
+end
 
 local function Send(msg)
     if not IsInGuild() then return end
-    local send = (C_ChatInfo and C_ChatInfo.SendAddonMessage) or SendAddonMessage
-    if send then pcall(send, PREFIX, msg, "GUILD") end
+    if #queue >= QUEUE_MAX then return end
+    queue[#queue + 1] = msg
+    Pump()
 end
 ns.GuildSend = Send
 ns.GuildHandlers = {}
+
+-- Guildies running Forever Told ----------------------------------------------------------
+
+local function SawGuildie(sender, classFile, level)
+    local DB = ns.DB
+    DB.guildies = DB.guildies or {}
+    local name = Short(sender)
+    local g = DB.guildies[name] or {}
+    DB.guildies[name] = g
+    g.t = time()
+    if classFile and classFile ~= "" then g.classFile = classFile end
+    if tonumber(level) and tonumber(level) > 0 then g.level = tonumber(level) end
+end
+
+-- Guildies heard from in the last 30 days, most recent first.
+function ns.Guildies()
+    local list, now = {}, time()
+    for name, g in pairs(ns.DB.guildies or {}) do
+        if now - (g.t or 0) <= GUILDIE_KEEP then
+            list[#list + 1] = { name = name, classFile = g.classFile, level = g.level, t = g.t }
+        end
+    end
+    table.sort(list, function(a, b) return a.t > b.t end)
+    return list
+end
+
+local function Hello()
+    local _, classFile = UnitClass("player")
+    stats.helloAt = time()
+    Send(("H~%d~%s~%d"):format(ns.ChronicleSince and ns.ChronicleSince() or 0, classFile or "", UnitLevel("player") or 0))
+end
 
 -- The gold I've promised on my own wanted poster for this player.
 function ns.MyReward(name)
@@ -224,9 +302,21 @@ local function OnMessage(prefix, msg, channel, sender)
     local DB = ns.DB
     local f = Split(msg)
     local kind, name = f[1], f[2]
+    stats.heard = stats.heard + 1
+    stats.lastSender = sender
+    if kind == "H" then SawGuildie(sender, f[3], f[4])
+    elseif kind == "I" then SawGuildie(sender, f[2], f[3])
+    else SawGuildie(sender) end
     if ns.GuildHandlers[kind] then ns.GuildHandlers[kind](f, sender) end
     if kind == "H" then
-        C_Timer.After(1 + math.random() * 4, SendAll)
+        C_Timer.After(1 + math.random() * 4, function()
+            local _, classFile = UnitClass("player")
+            Send(("I~%s~%d"):format(classFile or "", UnitLevel("player") or 0))
+            SendAll()
+        end)
+        if ns.Refresh then ns.Refresh() end
+    elseif kind == "I" then
+        if ns.Refresh then ns.Refresh() end
     elseif kind == "P" and name and name ~= "" then
         local b = DB.bounties[name] or { posters = {}, since = time() }
         DB.bounties[name] = b
@@ -288,6 +378,9 @@ local function Expire()
         end
         if not next(b.posters) then DB.bounties[name] = nil end
     end
+    for name, g in pairs(DB.guildies or {}) do
+        if now - (g.t or 0) > GUILDIE_KEEP then DB.guildies[name] = nil end
+    end
 end
 
 local started
@@ -297,13 +390,48 @@ ns.On("PLAYER_ENTERING_WORLD", function()
     local name, realm = UnitName("player")
     me = (realm and realm ~= "") and (name .. "-" .. realm) or name
     local register = (C_ChatInfo and C_ChatInfo.RegisterAddonMessagePrefix) or RegisterAddonMessagePrefix
-    if register then pcall(register, PREFIX) end
+    if register then
+        local ok, result = pcall(register, PREFIX)
+        -- 1 is "already registered", which is fine too.
+        stats.registered = Succeeded(ok, result) or result == 1
+        stats.registerResult = ok and tostring(result) or "error"
+    end
     Expire()
-    -- Guild info can take a few seconds to arrive after login.
-    C_Timer.After(10, function()
-        Send("H~" .. (ns.ChronicleSince and ns.ChronicleSince() or 0))
-        SendAll()
-    end)
+    -- Guild info can take a while to arrive after login: try again if we
+    -- don't look guilded yet, rather than staying silent all session.
+    local function Greet(tries)
+        if IsInGuild() then
+            Hello()
+            SendAll()
+        elseif tries > 0 then
+            C_Timer.After(20, function() Greet(tries - 1) end)
+        end
+    end
+    C_Timer.After(10, function() Greet(3) end)
 end)
 ns.On("CHAT_MSG_ADDON", OnMessage)
+
+-- /told guild: say hello again and show whether the guild channel is working.
+function ns.GuildReport()
+    local Print = ns.Print
+    if not IsInGuild() then
+        Print("You're not in a guild (or the game hasn't told us yet), so nothing is shared.")
+        return
+    end
+    Hello()
+    Print(("Guild channel: %s. Sent %d message%s, %d failed%s. Heard %d from guildies%s."):format(
+        stats.registered == false and ("|cffff6b5bnot registered (" .. tostring(stats.registerResult) .. ")|r") or "open",
+        stats.sent, stats.sent == 1 and "" or "s", stats.failed,
+        stats.lastError and (" (last code " .. stats.lastError .. ")") or "",
+        stats.heard, stats.lastSender and (", last from " .. stats.lastSender) or ""))
+    local names = {}
+    for _, g in ipairs(ns.Guildies()) do
+        names[#names + 1] = g.level and ("%s (%d)"):format(g.name, g.level) or g.name
+    end
+    if #names > 0 then
+        Print("Guildies running Forever Told: " .. table.concat(names, ", ") .. ".")
+    else
+        Print("No guildies running Forever Told heard from yet. Said hello; anyone online with it will answer in a few seconds. Try /told guild again then.")
+    end
+end
 
