@@ -8,7 +8,7 @@
 
 local _, ns = ...
 local U = ns.U
-local issecret, Short = U.issecret, U.Short
+local issecret, Short, Ask, Is, IsNot = U.issecret, U.Short, U.Ask, U.Is, U.IsNot
 
 local BLAME_WINDOW = 15
 
@@ -53,10 +53,10 @@ local DAMAGE = { SWING_DAMAGE = true, SPELL_DAMAGE = true, RANGE_DAMAGE = true, 
 local function OnCombatLog()
     if not CombatLogGetCurrentEventInfo then return end
     local _, sub, _, _, srcName, srcFlags, _, dstGUID, _, _, _, envType = CombatLogGetCurrentEventInfo()
-    if issecret(sub) or issecret(dstGUID) or dstGUID ~= UnitGUID("player") then return end
+    if issecret(sub) or issecret(dstGUID) or dstGUID ~= Ask(UnitGUID, "player") then return end
     if sub == "ENVIRONMENTAL_DAMAGE" then
         Hit(ENVIRONMENT[envType] or "the world itself", true, true)
-    elseif DAMAGE[sub] and srcName and not issecret(srcName) then
+    elseif DAMAGE[sub] and not issecret(srcName) and not issecret(srcFlags) and srcName then
         -- Players are the grudge tracker's business.
         local player = band and srcFlags and band(srcFlags, COMBATLOG_OBJECT_TYPE_PLAYER or 0x400) > 0
         if not player then Hit(Short(srcName), true) end
@@ -67,18 +67,18 @@ end
 local SCAN = { "target", "focus", "mouseover" }
 for i = 1, 40 do SCAN[#SCAN + 1] = "nameplate" .. i end
 
+-- In dungeons WoW Forever may keep any of these answers secret; then we just don't know.
 local function OnMe(unit)
-    return UnitExists(unit) and not UnitIsPlayer(unit) and UnitCanAttack("player", unit)
-        and UnitIsUnit(unit .. "target", "player")
+    return Is(UnitExists, unit) and IsNot(UnitIsPlayer, unit) and Is(UnitCanAttack, "player", unit)
+        and Is(UnitIsUnit, unit .. "target", "player")
 end
 
 local function Scan()
-    if not InCombatLockdown() then return end
+    if not Is(InCombatLockdown) then return end
     for _, unit in ipairs(SCAN) do
-        local ok, yes = pcall(OnMe, unit)
-        if ok and yes then
-            local name = UnitName(unit)
-            if name and not issecret(name) then Hit(name) end
+        if OnMe(unit) then
+            local name = Ask(UnitName, unit)
+            if name then Hit(name) end
         end
     end
 end
@@ -97,11 +97,12 @@ local TOUGH = { elite = 3, rareelite = 4, rare = 1, worldboss = 10 }
 
 -- How hard was it? Only known if we had it targeted.
 local function Toughness(name)
-    if not UnitExists("target") or UnitName("target") ~= name then return nil end
+    if not Is(UnitExists, "target") or Ask(UnitName, "target") ~= name then return nil end
     local level = UnitLevel("target")
-    local class = UnitClassification and UnitClassification("target") or "normal"
+    local class = UnitClassification and UnitClassification("target")
     if issecret(level) or issecret(class) then return nil end
-    if not level or level < 1 then level = UnitLevel("player") + 10 end
+    class = class or "normal"
+    if not level or level < 1 then level = (Ask(UnitLevel, "player") or 1) + 10 end
     return level + (TOUGH[class] or 0), level, class
 end
 
@@ -116,7 +117,7 @@ function ns.FoeSlain(name)
     z.kills = (z.kills or 0) + 1
     ns.Bump("kills")
     local score, level, class = Toughness(name)
-    if class and class ~= "normal" and class ~= "rare" and level >= UnitLevel("player") + 3 then
+    if class and class ~= "normal" and class ~= "rare" and level >= (Ask(UnitLevel, "player") or 1) + 3 then
         DB.counters.giants = (DB.counters.giants or 0) + 1
     end
     if score and (not DB.toughest or score > (DB.toughest.score or 0)) then

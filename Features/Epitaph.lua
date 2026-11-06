@@ -22,12 +22,10 @@ local CLOSINGS = {
 
 function ns.IsHardcore()
     if C_GameRules and C_GameRules.IsHardcoreActive then
-        local ok, on = pcall(C_GameRules.IsHardcoreActive)
-        if ok and on then return true end
+        if U.Is(C_GameRules.IsHardcoreActive) then return true end
     end
     if C_Seasons and C_Seasons.GetActiveSeason and Enum and Enum.SeasonID and Enum.SeasonID.Hardcore then
-        local ok, season = pcall(C_Seasons.GetActiveSeason)
-        if ok and season == Enum.SeasonID.Hardcore then return true end
+        if U.Ask(C_Seasons.GetActiveSeason) == Enum.SeasonID.Hardcore then return true end
     end
     return false
 end

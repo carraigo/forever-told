@@ -228,6 +228,7 @@ local function BossKilled(id, name)
     Add("boss", Pick(ns.FLAVOUR.boss):format(name or "a mighty foe"))
 end
 handlers.ENCOUNTER_END = function(id, name, _, _, success)
+    if issecret(success) then return end
     if success == 1 or success == true then BossKilled(id, name) end
 end
 handlers.BOSS_KILL = function(id, name) BossKilled(id, name) end

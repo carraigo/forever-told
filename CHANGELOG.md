@@ -1,3 +1,8 @@
+## v1.1.4
+
+**Fixes**
+- WoW Forever: no more stream of Lua errors in dungeons ("Foes.lua:79: attempt to perform boolean test on local 'yes' (a secret boolean value)"). Inside instances the game keeps some answers secret from addons, such as who an enemy is targeting. Forever Told now checks every answer before using it and treats a secret one as "don't know". The same fix covers grudge tracking, nemesis alerts, group members, famous kills and boss kills.
+
 ## v1.1.3
 
 **Fixes**

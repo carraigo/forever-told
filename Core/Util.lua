@@ -6,6 +6,30 @@ local U = {}
 ns.U = U
 
 U.issecret = issecretvalue or function() return false end
+local issecret = U.issecret
+
+-- WoW Forever hides some answers from addons inside dungeons ("secret values").
+-- Even testing one with `if` is an error, so ask through these instead.
+
+local function Clean(ok, ...)
+    if not ok then return nil end
+    for i = 1, select("#", ...) do
+        if issecret((select(i, ...))) then return nil end
+    end
+    return ...
+end
+
+-- Calls fn and returns what it says, or nothing if it fails or anything it says is secret.
+function U.Ask(fn, ...)
+    if type(fn) ~= "function" then return nil end
+    return Clean(pcall(fn, ...))
+end
+
+-- A yes/no question: true only when the game plainly says yes.
+function U.Is(fn, ...) return U.Ask(fn, ...) == true end
+
+-- A yes/no question: true only when the game plainly says no.
+function U.IsNot(fn, ...) return U.Ask(fn, ...) == false end
 
 function U.Count(t)
     local n = 0

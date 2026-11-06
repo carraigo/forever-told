@@ -94,7 +94,7 @@ math.atan2 = math.atan2 or function(y, x) return math.atan(y, x) end
 -- The test world: a level 24 Human Warrior called Craig, in a guild, with a
 -- hostile rogue (TARGETNAME) who can be made to target us. Time only moves
 -- when a test moves NOWT.
-unpack=unpack or table.unpack; IsInGroup=function() return false end; RequestTimePlayed=function() end; C_Map={GetBestMapForUnit=function() return 1 end, GetMapInfo=function() return {name="Duskwood", parentMapID=2, mapType=3} end}; IsInRaid=function() return false end; GetNumGroupMembers=function() return 0 end; IsMounted=function() return false end; UnitOnTaxi=function() return false end; issecretvalue=function() return false end; UnitGUID=function() return "me" end
+unpack=unpack or table.unpack; IsInGroup=function() return false end; RequestTimePlayed=function() end; C_Map={GetBestMapForUnit=function() return 1 end, GetMapInfo=function() return {name="Duskwood", parentMapID=2, mapType=3} end}; IsInRaid=function() return false end; GetNumGroupMembers=function() return 0 end; IsMounted=function() return false end; UnitOnTaxi=function() return false end; SECRET=setmetatable({}, {__tostring=function() return "<secret>" end}); issecretvalue=function(v) return v == SECRET end; UnitGUID=function() return "me" end
 ADDONMSG={}; C_ChatInfo = { RegisterAddonMessagePrefix=function() end, SendAddonMessage=function(p,m,c) ADDONMSG[#ADDONMSG+1]=m end }
 tContains=function(t,v) for _,x in ipairs(t) do if x==v then return true end end return false end; CLASS_ICON_TCOORDS={ROGUE={0,0.25,0.5,0.75}}; WorldFrame=UIParent; CreateColor=function(...) return {...} end
 UISpecialFrames = {}; tinsert = table.insert; GetMoney = function() return 123456 end
