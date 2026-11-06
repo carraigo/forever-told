@@ -129,8 +129,8 @@ local run -- the dungeon we're in: { zone, bosses, with }
 local function Group()
     local names = {}
     for i = 1, 4 do
-        local name = UnitName("party" .. i)
-        if name and not U.issecret(name) and name ~= UnitName("player") then names[#names + 1] = name end
+        local name = U.Ask(UnitName, "party" .. i)
+        if name and name ~= U.Ask(UnitName, "player") then names[#names + 1] = name end
     end
     return names
 end

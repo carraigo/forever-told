@@ -2,7 +2,8 @@
 -- met, and how many dungeons and boss kills you've shared.
 
 local _, ns = ...
-local ShortName = ns.U.Short
+local U = ns.U
+local ShortName, Ask, Is = U.Short, U.Ask, U.Is
 
 local RUN_GAP = 30 * 60 -- re-entering the same dungeon within 30 min is the same run
 
@@ -11,17 +12,17 @@ local currentRun        -- { zone, at }
 
 local function GroupUnits()
     local units = {}
-    if IsInRaid() then
-        for i = 1, GetNumGroupMembers() do units[#units + 1] = "raid" .. i end
-    elseif IsInGroup() then
-        for i = 1, GetNumSubgroupMembers() do units[#units + 1] = "party" .. i end
+    if Is(IsInRaid) then
+        for i = 1, Ask(GetNumGroupMembers) or 0 do units[#units + 1] = "raid" .. i end
+    elseif Is(IsInGroup) then
+        for i = 1, Ask(GetNumSubgroupMembers) or 0 do units[#units + 1] = "party" .. i end
     end
     return units
 end
 
 local function FullName(unit)
-    local name, realm = UnitName(unit)
-    if not name or ns.U.issecret(name) or name == UNKNOWNOBJECT or name == "Unknown" then return nil end
+    local name, realm = Ask(UnitName, unit)
+    if not name or name == UNKNOWNOBJECT or name == "Unknown" then return nil end
     if realm and realm ~= "" then return name .. "-" .. realm end
     return name
 end
@@ -29,14 +30,14 @@ end
 local function OnRoster()
     local DB = ns.DB
     local now, seen, newFaces = time(), {}, {}
-    local raid = IsInRaid()
+    local raid = Is(IsInRaid)
     for _, unit in ipairs(GroupUnits()) do
         local name = FullName(unit)
-        if name and not UnitIsUnit(unit, "player") then
+        if name and Ask(UnitIsUnit, unit, "player") == false then
             seen[name] = true
             local f = DB.fellows[name]
             if not f then
-                local className, classFile = UnitClass(unit)
+                local className, classFile = Ask(UnitClass, unit)
                 f = { first = now, firstLvl = UnitLevel("player"), firstZone = ns.Zone(),
                       class = className, classFile = classFile, groups = 0, dungeons = 0, bosses = 0 }
                 DB.fellows[name] = f

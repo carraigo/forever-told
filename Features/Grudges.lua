@@ -8,7 +8,7 @@
 
 local _, ns = ...
 local U = ns.U
-local issecret, Short = U.issecret, U.Short
+local issecret, Short, Ask, Is = U.issecret, U.Short, U.Ask, U.Is
 
 local BLAME_WINDOW = 15      -- seconds before death an attacker still counts
 local ALERT_COOLDOWN = 300   -- one "nemesis nearby" alert per player per 5 min
@@ -19,17 +19,18 @@ local alerted, revenged = {}, {}
 local band = bit and bit.band
 local PlayerKilled, Wanted -- defined further down
 
+-- In dungeons WoW Forever may keep any of these answers secret; then we just don't know.
 local function Hostile(unit)
-    return UnitExists(unit) and UnitIsPlayer(unit) and UnitCanAttack("player", unit)
+    return Is(UnitExists, unit) and Is(UnitIsPlayer, unit) and Is(UnitCanAttack, "player", unit)
 end
 
 local function UnitInfo(unit)
-    local name, realm = UnitName(unit)
-    if not name or issecret(name) then return nil end
+    local name, realm = Ask(UnitName, unit)
+    if not name then return nil end
     if realm and realm ~= "" then name = name .. "-" .. realm end
-    local className, classFile = UnitClass(unit)
-    local level = UnitLevel(unit)
-    local guild = GetGuildInfo and GetGuildInfo(unit)
+    local className, classFile = Ask(UnitClass, unit)
+    local level = Ask(UnitLevel, unit)
+    local guild = Ask(GetGuildInfo, unit)
     return name, { class = className, classFile = classFile, level = (level and level > 0) and level or nil, guild = guild }
 end
 
@@ -46,15 +47,11 @@ local SCAN = { "target", "focus", "mouseover" }
 for i = 1, 40 do SCAN[#SCAN + 1] = "nameplate" .. i end
 
 local function Scan()
-    if not InCombatLockdown() then return end
+    if not Is(InCombatLockdown) then return end
     for _, unit in ipairs(SCAN) do
-        local ok, hostile = pcall(Hostile, unit)
-        if ok and hostile then
-            local okT, onMe = pcall(UnitIsUnit, unit .. "target", "player")
-            if okT and onMe then
-                local name, info = UnitInfo(unit)
-                if name then Remember(name, info) end
-            end
+        if Hostile(unit) and Is(UnitIsUnit, unit .. "target", "player") then
+            local name, info = UnitInfo(unit)
+            if name then Remember(name, info) end
         end
     end
 end
@@ -64,14 +61,15 @@ local DAMAGE = { SWING_DAMAGE = true, SPELL_DAMAGE = true, RANGE_DAMAGE = true, 
 local function OnCombatLog()
     if not CombatLogGetCurrentEventInfo or not band then return end
     local _, sub, _, srcGUID, srcName, srcFlags, _, dstGUID, dstName = CombatLogGetCurrentEventInfo()
-    if issecret(sub) then return end
-    local me = UnitGUID("player")
+    if issecret(sub) or issecret(srcGUID) or issecret(srcName) or issecret(srcFlags)
+        or issecret(dstGUID) or issecret(dstName) then return end
+    local me = Ask(UnitGUID, "player")
     if DAMAGE[sub] and dstGUID == me and srcName and srcFlags
         and band(srcFlags, COMBATLOG_OBJECT_TYPE_PLAYER or 0x400) > 0
         and band(srcFlags, COMBATLOG_OBJECT_REACTION_HOSTILE or 0x40) > 0 then
         local info = attackers[srcName] or {}
         if GetPlayerInfoByGUID then
-            local className, classFile = GetPlayerInfoByGUID(srcGUID)
+            local className, classFile = Ask(GetPlayerInfoByGUID, srcGUID)
             info.class, info.classFile = className or info.class, classFile or info.classFile
         end
         Remember(srcName, info, true)
@@ -221,11 +219,12 @@ end
 -- Seeing a grudge target die while we're fighting them also counts.
 local targetAlive = {}
 local function WatchTarget()
-    if not UnitExists("target") or not UnitIsPlayer("target") then return end
+    if not Is(UnitExists, "target") or not Is(UnitIsPlayer, "target") then return end
     local name = UnitInfo("target")
     if not name or not Wanted(name) then return end
-    local dead = UnitIsDead("target")
-    if dead and targetAlive[name] and InCombatLockdown() then PlayerKilled(name) end
+    local dead = Ask(UnitIsDead, "target")
+    if dead == nil then return end
+    if dead and targetAlive[name] and Is(InCombatLockdown) then PlayerKilled(name) end
     targetAlive[name] = not dead
 end
 
@@ -234,8 +233,7 @@ end
 local function CheckNearby(unit)
     local DB = ns.DB
     if not unit then return end
-    local ok, hostile = pcall(Hostile, unit)
-    if not ok or not hostile then return end
+    if not Hostile(unit) then return end
     local name = UnitInfo(unit)
     if not name then return end
     -- Anyone wanted gets reported to the guild, alerts on or off.

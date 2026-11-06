@@ -213,9 +213,10 @@ ns.On("LOOT_READY", function()
         return
     end
     -- Famous named mobs: looting their corpse counts as the kill.
-    if UnitExists("target") and UnitIsDead("target") then
-        local name = UnitName("target")
-        if name and not ns.U.issecret(name) and FAMOUS[name] then
+    local U = ns.U
+    if U.Is(UnitExists, "target") and U.Is(UnitIsDead, "target") then
+        local name = U.Ask(UnitName, "target")
+        if name and FAMOUS[name] then
             ns.DB.counters.kills = ns.DB.counters.kills or {}
             ns.DB.counters.kills[name] = true
             ns.CheckDeeds()
@@ -229,9 +230,9 @@ local ticker
 ns.On("PLAYER_ENTERING_WORLD", function()
     if ticker then return end
     ticker = C_Timer.NewTicker(3, function()
-        local onTaxi = UnitOnTaxi and UnitOnTaxi("player") or false
+        local onTaxi = ns.U.Is(UnitOnTaxi, "player")
         -- The game counts a flight path as being mounted; that's not your own mount.
-        local mounted = not onTaxi and IsMounted and IsMounted() or false
+        local mounted = not onTaxi and ns.U.Is(IsMounted)
         if mounted and not wasMounted and C("mounted") == 0 then
             Inc("mounted")
             ns.CheckDeeds()

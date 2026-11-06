@@ -562,6 +562,36 @@ test("the combat log isn't requested on WoW Forever", function()
     eq(REGISTERED.COMBAT_LOG_EVENT_UNFILTERED, nil, "combat log registered on WoW Forever")
 end)
 
+-- WoW Forever in a dungeon: the game keeps some answers secret, and testing one
+-- with "if" is an error. A secret must count as "don't know", never as yes.
+test("secret answers in a dungeon are skipped, not tested", function()
+    local saved = {}
+    for _, k in ipairs({ "UnitIsUnit", "UnitCanAttack", "UnitIsPlayer", "UnitExists", "UnitName", "UnitIsDead", "UnitLevel" }) do saved[k] = _G[k] end
+    local function secret() return SECRET end
+    NOWT = NOWT + 100 -- earlier attackers are forgotten
+    local grudges = count(DB.grudges)
+    -- A monster is targeting us, but the game won't say so.
+    UnitIsPlayer = function(u) return u == "player" end
+    UnitIsUnit = secret
+    TICK()
+    eq(NS.RecentFoe(), nil, "a secret 'targeting me' counted as yes")
+    -- Nothing about any other unit can be read.
+    UnitExists, UnitIsPlayer, UnitCanAttack, UnitIsDead = secret, secret, secret, secret
+    UnitName = function(u) if u == "player" then return "Craig" end return SECRET end
+    UnitLevel = function(u) if u == "player" then return 24 end return SECRET end
+    TICK()
+    FIRE("PLAYER_TARGET_CHANGED")
+    FIRE("NAME_PLATE_UNIT_ADDED", "nameplate1")
+    FIRE("UPDATE_MOUSEOVER_UNIT")
+    FIRE("LOOT_READY")
+    FIRE("CHAT_MSG_COMBAT_XP_GAIN", "Stabby dies, you gain 300 experience.")
+    FIRE("ENCOUNTER_END", 99, "Edwin VanCleef", 1, 5, SECRET)
+    eq(NS.RecentFoe(), nil, "a secret unit counted as a foe")
+    eq(count(DB.grudges), grudges, "grudges")
+    eq(DB.bosses[99], nil, "a secret boss result counted as a kill")
+    for k, v in pairs(saved) do _G[k] = v end
+end)
+
 -- Pages ---------------------------------------------------------------------------------
 
 test("every page opens", function()
