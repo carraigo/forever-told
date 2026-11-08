@@ -56,9 +56,19 @@ function ns.Bump(field, amount)
 end
 local Bump = ns.Bump
 
+local UNKNOWN = "somewhere unknown"
+ns.UNKNOWN_ZONE = UNKNOWN
+
 function ns.Zone()
+    -- Inside a dungeon, ask the dungeon its name: on the loading screen in, the
+    -- zone text can still name the place outside (Orgrimmar for Ragefire Chasm).
+    if U.Is(IsInInstance) and GetInstanceInfo then
+        local name = U.Ask(GetInstanceInfo)
+        if type(name) == "string" and name ~= "" then return name end
+    end
     local zone = GetRealZoneText and GetRealZoneText() or GetZoneText()
-    return (zone and zone ~= "") and zone or "somewhere unknown"
+    if issecret(zone) then zone = nil end
+    return (zone and zone ~= "") and zone or UNKNOWN
 end
 local Zone = ns.Zone
 
@@ -115,8 +125,14 @@ local function CheckZone()
     local zone = Zone()
     local continent, continentID = Continent()
     if continentID then DB.continents[continentID] = continent end
-    if DB.zones[zone] then return end
-    local inInstance = IsInInstance()
+    -- Before the world has loaded the game can't say where we are; that's no place.
+    if zone == UNKNOWN then return end
+    local inInstance = U.Is(IsInInstance)
+    if DB.zones[zone] then
+        -- An earlier visit may have been noted before the game knew it was a dungeon.
+        if inInstance then DB.zones[zone].instance = true end
+        return
+    end
     DB.zones[zone] = { t = time(), lvl = UnitLevel("player"), continent = continent, instance = inInstance and true or nil }
     if inInstance then
         Bump("dungeons")
@@ -133,6 +149,8 @@ handlers.PLAYER_ENTERING_WORLD = function(isLogin, isReload)
         Add("start", ("The story of %s the %s begins in %s."):format(UnitName("player"), (UnitClass("player")), Zone()))
     end
     CheckZone()
+    -- The game can still be settling in just after a loading screen; look again.
+    if C_Timer and C_Timer.After then C_Timer.After(2, CheckZone) end
     if (isLogin or isReload or isLogin == nil) and not played.total and DB.trackTime and RequestTimePlayed then
         RequestTimePlayed()
     end
@@ -337,6 +355,16 @@ local MIGRATIONS = {
     function(DB)
         for zone, info in pairs(DB.zones) do
             if info.instance then DB.chronicled[zone] = true end
+        end
+    end,
+    -- 6. Version 1.1.5: "somewhere unknown" was never a place, and a dungeon first
+    -- noted before the game called it one is still a dungeon if a boss died there.
+    function(DB)
+        DB.zones[UNKNOWN] = nil
+        DB.zoneStats[UNKNOWN] = nil
+        for _, b in pairs(DB.bosses) do
+            local info = type(b) == "table" and b.zone and DB.zones[b.zone]
+            if info then info.instance = true end
         end
     end,
 }

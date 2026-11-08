@@ -1,3 +1,10 @@
+## v1.1.5
+
+**Fixes**
+- WoW Forever: you no longer show up as one of your own guildies. WoW Forever sends guild messages as "Name Surname", so Forever Told didn't recognise its own messages coming back, listed you on the Guild Chronicles page, answered your own hello and sent all your news to the guild twice. Guildies saved under "Name Surname" are tidied up too, so nobody is counted twice.
+- Dungeons are now filed under the dungeon's own name. On the loading screen in, the game could still name the zone outside, so Ragefire Chasm runs counted as Orgrimmar and time spent in Wailing Caverns went to the cave outside. A dungeon first noted as an ordinary zone is marked as a dungeon on your next visit, or straight away if you've killed a boss there.
+- "somewhere unknown" is no longer saved as a place you've discovered, and is removed from your atlas and places count.
+
 ## v1.1.4
 
 **Fixes**

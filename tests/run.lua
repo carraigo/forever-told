@@ -65,7 +65,10 @@ ForeverToldDB = {
         { t = 3, lvl = 6, kind = "pvp", text = "Ganked by Someone." },
         { t = 4, lvl = 6, kind = "note", text = "Paid Bob 5 gold for taking down Someone." },
     },
-    zones = { ["Elwynn Forest"] = 100, ["The Deadmines"] = { t = 50, lvl = 18, instance = true } },
+    zones = { ["Elwynn Forest"] = 100, ["The Deadmines"] = { t = 50, lvl = 18, instance = true },
+        ["somewhere unknown"] = { t = 1, lvl = 1 }, ["Wailing Caverns"] = { t = 60, lvl = 20 } },
+    zoneStats = { ["somewhere unknown"] = { time = 112 } },
+    bosses = { [585] = { t = 61, name = "Lady Anacondra", zone = "Wailing Caverns" } },
     deathZones = { ["Elwynn Forest"] = 2 },
     grudges = { ["Gank-Testrealm"] = { kills = 1, revenge = 0 }, Real = { kills = 1, revenge = 0, first = 1 } },
     posters = { ["Gank-Testrealm"] = { reward = 5 } },
@@ -85,7 +88,10 @@ print("Forever Told tests")
 -- Upgrades -----------------------------------------------------------------------------
 
 test("upgrades run once and tidy old data", function()
-    eq(DB.version, 5, "version")
+    eq(DB.version, 6, "version")
+    eq(DB.zones["somewhere unknown"], nil, "\"somewhere unknown\" isn't a place")
+    eq(DB.zoneStats["somewhere unknown"], nil, "nor does it keep time")
+    eq(DB.zones["Wailing Caverns"].instance, true, "a zone with a boss kill is a dungeon")
     eq(DB.chronicled["The Deadmines"], true, "old dungeon runs aren't chronicle news")
     eq(type(DB.zones["Elwynn Forest"]), "table", "old zone record upgraded")
     eq(DB.entries[1].text, "my own note", "own notes kept")
@@ -444,7 +450,9 @@ test("a guildie with no milestones yet still shows up", function()
     assert(found and found.level == 7 and found.classFile == "PRIEST", "hello didn't add Mira")
     assert(Sent("^I~WARRIOR~24$"), "didn't answer the hello: " .. table.concat(ADDONMSG, " / "))
     FIRE("CHAT_MSG_ADDON", "FTold1", "I~SHAMAN~5", "GUILD", "Tok-Realm")
-    assert(Find(Rows("chronicle"), "Also keeping a journal: .*Tok.*Mira"), "keepers not listed")
+    -- Both were heard in the same second, so either may come first.
+    local rows = Rows("chronicle")
+    assert(Find(rows, "Also keeping a journal: .*Tok") and Find(rows, "Also keeping a journal: .*Mira"), "keepers not listed")
 end)
 
 test("a hello asks for news since I was last online, not since my newest entry", function()
@@ -590,6 +598,70 @@ test("secret answers in a dungeon are skipped, not tested", function()
     eq(count(DB.grudges), grudges, "grudges")
     eq(DB.bosses[99], nil, "a secret boss result counted as a kill")
     for k, v in pairs(saved) do _G[k] = v end
+end)
+
+-- WoW Forever names and zones --------------------------------------------------------------
+
+test("on WoW Forever my own guild messages aren't a guildie", function()
+    ADDONMSG = {}
+    FIRE("CHAT_MSG_ADDON", "FTold1", "H~0~WARRIOR~24", "GUILD", "Craig Joseph")
+    for _, g in ipairs(NS.Guildies()) do assert(g.name ~= "Craig" and g.name ~= "Craig Joseph", "listed myself") end
+    assert(not Sent("^I~"), "answered my own hello")
+    FIRE("CHAT_MSG_ADDON", "FTold1", "I~PRIEST~21", "GUILD", "Vatic Cane")
+    local found
+    for _, g in ipairs(NS.Guildies()) do if g.name == "Vatic" then found = g end end
+    assert(found and found.level == 21, "Vatic Cane not heard as Vatic")
+end)
+
+test("old \"Name Surname\" guildies and posters are tidied", function()
+    DB.guildies["Craig Joseph"] = { t = time(), level = 20 }
+    DB.guildies["Rhozak Warbreaker"] = { t = time(), level = 19, classFile = "WARRIOR" }
+    DB.bounties.Dotty = { posters = { ["Vatic Cane"] = { kills = 1, ours = 0, t = time() } }, since = time(), t = time() }
+    NS.TidyNames()
+    eq(DB.guildies["Craig Joseph"], nil, "myself still a guildie")
+    eq(DB.guildies.Craig, nil, "myself still a guildie")
+    eq(DB.guildies.Rhozak and DB.guildies.Rhozak.level, 19, "guildie re-filed")
+    eq(DB.guildies["Rhozak Warbreaker"], nil, "old guildie key left")
+    assert(DB.bounties.Dotty.posters["Vatic-Cane"] and not DB.bounties.Dotty.posters["Vatic Cane"], "poster not re-filed")
+    DB.bounties.Dotty = nil
+end)
+
+test("a dungeon is named by the dungeon, not the zone outside", function()
+    local saved = { GetRealZoneText = GetRealZoneText, IsInInstance = IsInInstance, GetInstanceInfo = GetInstanceInfo }
+    GetRealZoneText = function() return "Orgrimmar" end
+    IsInInstance = function() return true, "party" end
+    GetInstanceInfo = function() return "Ragefire Chasm", "party" end
+    local runs = DB.counters.runs or 0
+    FIRE("PLAYER_ENTERING_WORLD")
+    eq(DB.zones["Ragefire Chasm"] and DB.zones["Ragefire Chasm"].instance, true, "dungeon not noted as one")
+    eq((DB.counters.runZones or {})["Ragefire Chasm"], 1, "run not filed under the dungeon")
+    eq((DB.counters.runZones or {}).Orgrimmar, nil, "run filed under the city outside")
+    eq(DB.counters.runs, runs + 1, "run counted")
+    FIRE("CHAT_MSG_COMBAT_XP_GAIN", "Ragefire Trogg dies, you gain 90 experience.")
+    eq(DB.foes["Ragefire Trogg"].zones["Ragefire Chasm"], 1, "kill filed under the dungeon")
+    GetRealZoneText, IsInInstance, GetInstanceInfo = saved.GetRealZoneText, saved.IsInInstance, saved.GetInstanceInfo
+    FIRE("ZONE_CHANGED_NEW_AREA")
+end)
+
+test("a dungeon first seen as a plain zone is marked once we're inside", function()
+    local saved = { GetRealZoneText = GetRealZoneText, IsInInstance = IsInInstance }
+    GetRealZoneText = function() return "Blackfathom Deeps" end
+    FIRE("ZONE_CHANGED_NEW_AREA")
+    eq(DB.zones["Blackfathom Deeps"].instance, nil, "outside")
+    IsInInstance = function() return true, "party" end
+    FIRE("PLAYER_ENTERING_WORLD")
+    eq(DB.zones["Blackfathom Deeps"].instance, true, "not marked as a dungeon")
+    for k, v in pairs(saved) do _G[k] = v end
+    FIRE("ZONE_CHANGED_NEW_AREA")
+end)
+
+test("no zone text yet is no place", function()
+    local saved = GetRealZoneText
+    GetRealZoneText = function() return "" end
+    FIRE("ZONE_CHANGED_NEW_AREA")
+    eq(DB.zones["somewhere unknown"], nil, "\"somewhere unknown\" saved as a place")
+    GetRealZoneText = saved
+    FIRE("ZONE_CHANGED_NEW_AREA")
 end)
 
 -- Pages ---------------------------------------------------------------------------------
