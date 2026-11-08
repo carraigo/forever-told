@@ -297,7 +297,10 @@ end
 
 local function OnMessage(prefix, msg, channel, sender)
     if prefix ~= PREFIX or channel ~= "GUILD" then return end
-    if issecret(msg) or issecret(sender) or type(msg) ~= "string" or not sender then return end
+    if issecret(msg) or issecret(sender) or type(msg) ~= "string" or type(sender) ~= "string" then return end
+    -- WoW Forever sends "Name Surname"; we call ourselves "Name-Surname". Character
+    -- names have no spaces, so make them one shape, or our own echo looks like a guildie.
+    sender = sender:gsub(" ", "-")
     if Short(sender) == Short(me or "") then return end
     local DB = ns.DB
     local f = Split(msg)
@@ -383,12 +386,38 @@ local function Expire()
     end
 end
 
+-- 1.1.4 and older kept WoW Forever's "Name Surname" senders as they came: our own
+-- echo turned up as a guildie, and guildies could be listed twice. Put them right.
+local function TidyNames()
+    local DB = ns.DB
+    local function Refile(t, rename)
+        local spaced = {}
+        for key, v in pairs(t) do
+            if key:find(" ", 1, true) then spaced[key] = v end
+        end
+        for key, v in pairs(spaced) do
+            t[key] = nil
+            local new = rename((key:gsub(" ", "-")))
+            local kept = t[new]
+            if not kept or (kept.t or 0) < (v.t or 0) then t[new] = v end
+        end
+    end
+    DB.guildies = DB.guildies or {}
+    Refile(DB.guildies, Short)
+    DB.guildies[Short(me)] = nil
+    for _, b in pairs(DB.bounties) do
+        if b.posters then Refile(b.posters, function(n) return n end) end
+    end
+end
+ns.TidyNames = TidyNames
+
 local started
 ns.On("PLAYER_ENTERING_WORLD", function()
     if started then return end
     started = true
     local name, realm = UnitName("player")
     me = (realm and realm ~= "") and (name .. "-" .. realm) or name
+    TidyNames()
     local register = (C_ChatInfo and C_ChatInfo.RegisterAddonMessagePrefix) or RegisterAddonMessagePrefix
     if register then
         local ok, result = pcall(register, PREFIX)

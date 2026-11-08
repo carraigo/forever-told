@@ -23,6 +23,14 @@ end
 local function Arrive()
     Flush()
     here, since = ns.Zone(), GetTime()
+    if here == ns.UNKNOWN_ZONE then here, since = nil, nil end
+end
+
+-- Just after a loading screen the game may still name the place we left.
+local function Settle()
+    if C_Timer and C_Timer.After then
+        C_Timer.After(2, function() if ns.Zone() ~= here then Arrive() end end)
+    end
 end
 
 ns.Listen("quest", function()
@@ -30,7 +38,7 @@ ns.Listen("quest", function()
     z.quests = (z.quests or 0) + 1
 end)
 
-ns.On("PLAYER_ENTERING_WORLD", Arrive)
+ns.On("PLAYER_ENTERING_WORLD", function() Arrive() Settle() end)
 ns.On("ZONE_CHANGED_NEW_AREA", Arrive)
 ns.On("PLAYER_LEAVING_WORLD", Flush)
 ns.On("PLAYER_LOGOUT", Flush)
