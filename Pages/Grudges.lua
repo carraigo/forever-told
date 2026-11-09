@@ -23,6 +23,21 @@ local function SeenText(record)
     return ("last seen in %s, %s%s"):format(where, when, who), by ~= nil and t ~= nil and time() - t < 1800
 end
 
+-- Ask first: forgiving can't be taken back.
+function K.ConfirmForgive(name)
+    if StaticPopupDialogs and StaticPopup_Show then
+        StaticPopupDialogs.FOREVERTOLD_FORGIVE = StaticPopupDialogs.FOREVERTOLD_FORGIVE or {
+            text = "Forgive %s? The grudge is forgotten and your wanted poster comes down.",
+            button1 = YES or "Yes", button2 = NO or "No",
+            OnAccept = function(_, data) ns.Forgive(data) end,
+            timeout = 0, whileDead = true, hideOnEscape = true,
+        }
+        StaticPopup_Show("FOREVERTOLD_FORGIVE", Short(name), nil, name)
+    else
+        ns.Forgive(name)
+    end
+end
+
 local function MyGrudges()
     local list = ns.SortedGrudges()
     if #list == 0 then return Empty("Nobody's ganked you yet. When they do, they'll be written down here.") end
@@ -39,13 +54,16 @@ local function MyGrudges()
             sub = ("%s%s%s%s"):format(who, who ~= "" and " · " or "", (SeenText(g) or "never seen since"),
                 g.exact and "" or " · best guess"),
             right = ("%d – %d"):format(ours, theirs), card = isOpen or nil,
-            onClick = function() ns.ShowPoster(item.name) end,
+            onClick = function(button)
+                if button == "RightButton" then K.ConfirmForgive(item.name) else ns.ShowPoster(item.name) end
+            end,
             tip = { title = Short(item.name), lines = {
                 who ~= "" and who or nil,
                 ("Killed you %s, first on %s"):format(Plural(g.kills, "time"), date("%d %B", g.first)),
                 ("Your revenge: %d%s"):format(g.revenge, (g.avenged or 0) > 0 and (" · avenged by your guild: %d"):format(g.avenged) or ""),
                 g.exact and "Seen in the combat log" or "Best guess: they were targeting you when you died",
                 isOpen and "Click to make a wanted poster" or "Click to see their poster",
+                "Right-click to forgive: the grudge goes and your poster comes down",
             } },
         }
         table.insert(isOpen and open or settled, row)
