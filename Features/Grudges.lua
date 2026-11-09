@@ -19,10 +19,36 @@ local alerted, revenged = {}, {}
 local band = bit and bit.band
 local PlayerKilled, Wanted -- defined further down
 
+-- Someone in my group or guild. They can turn on me for a moment (Arugal's
+-- Curse in Shadowfang Keep, a mind control), but that's no grudge.
+local function Friendly(unit)
+    if Is(UnitInParty, unit) or Ask(UnitInRaid, unit) ~= nil or Is(UnitIsInMyGuild, unit) then return true end
+    local mine, theirs = Ask(GetGuildInfo, "player"), Ask(GetGuildInfo, unit)
+    return mine ~= nil and mine == theirs
+end
+
 -- In dungeons WoW Forever may keep any of these answers secret; then we just don't know.
 local function Hostile(unit)
     return Is(UnitExists, unit) and Is(UnitIsPlayer, unit) and Is(UnitCanAttack, "player", unit)
+        and not Friendly(unit)
 end
+
+-- The same, by name, for whoever we remembered: party, raid, or a guildie we've heard from.
+local function FriendlyName(name, a)
+    local short = Short(name)
+    if ns.DB.guildies and ns.DB.guildies[short] then return true end
+    local mine = Ask(GetGuildInfo, "player")
+    if a and a.guild and mine and a.guild == mine then return true end
+    local units = {}
+    for i = 1, 4 do units[#units + 1] = "party" .. i end
+    for i = 1, 40 do units[#units + 1] = "raid" .. i end
+    for _, unit in ipairs(units) do
+        local n = Ask(UnitName, unit)
+        if n and Short(n) == short then return true end
+    end
+    return false
+end
+ns.FriendlyName = FriendlyName
 
 local function UnitInfo(unit)
     local name, realm = Ask(UnitName, unit)
@@ -115,7 +141,7 @@ local function OnDeath()
     local DB = ns.DB
     local now, killer, best = GetTime(), nil, nil
     for name, a in pairs(attackers) do
-        if now - a.t <= BLAME_WINDOW then
+        if now - a.t <= BLAME_WINDOW and not FriendlyName(name, a) then
             -- An exact combat-log attacker beats a guess; otherwise the most recent.
             local score = a.t + (a.exact and 1000 or 0)
             if not best or score > best then killer, best = name, score end
@@ -190,6 +216,29 @@ function ns.Avenged(name, by)
     if ns.ShowToast then ns.ShowToast("Avenged by " .. Short(by), Short(key), score) end
     if ns.PostBounty then ns.PostBounty(key) end
     if ns.CheckDeeds then ns.CheckDeeds() end
+end
+
+-- Let it go: the grudge is gone and my wanted poster comes down.
+function ns.Forgive(name)
+    local DB = ns.DB
+    local key = name and FindGrudge(name)
+    if not key then return nil end
+    DB.grudges[key] = nil
+    if DB.posters[key] then DB.posters[key].done = true end
+    if ns.WithdrawBounty then ns.WithdrawBounty(key) end
+    if ns.Refresh then ns.Refresh() end
+    return key
+end
+
+-- 1.1.5 and older could hold a grudge against a guildie who'd turned on us for a moment.
+function ns.ForgiveGuildies()
+    local DB = ns.DB
+    local forgiven = {}
+    for key in pairs(DB.grudges) do
+        if DB.guildies and DB.guildies[Short(key)] then forgiven[#forgiven + 1] = key end
+    end
+    for _, key in ipairs(forgiven) do ns.Forgive(key) end
+    return forgiven
 end
 
 -- Every player kill goes through here: your own grudges and guild bounties.

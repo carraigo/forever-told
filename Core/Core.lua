@@ -474,6 +474,11 @@ SlashCmdList.FOREVERTOLD = function(msg)
     elseif cmd == "epitaph" and ns.ShowEpitaph then
         ns.ShowEpitaph()
         return
+    elseif cmd == "forgive" and ns.Forgive then
+        local key = rest ~= "" and ns.Forgive(rest)
+        Print(key and ("Forgiven: %s. Your poster is down."):format(U.Short(key))
+            or "Usage: /told forgive <name>, someone on your grudge list.")
+        return
     elseif cmd == "guild" and ns.GuildReport then
         ns.GuildReport()
         return

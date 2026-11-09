@@ -370,7 +370,7 @@ function S.List(parent)
             self.bg:SetColorTexture(1, 1, 1, item and item.card and 0.03 or 0)
             S.HideTip()
         end)
-        r:SetScript("OnMouseUp", function(self) if self.item and self.item.onClick then self.item.onClick() end end)
+        r:SetScript("OnMouseUp", function(self, button) if self.item and self.item.onClick then self.item.onClick(button) end end)
         pool[used] = r
         return r
     end

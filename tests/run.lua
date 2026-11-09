@@ -664,6 +664,78 @@ test("no zone text yet is no place", function()
     FIRE("ZONE_CHANGED_NEW_AREA")
 end)
 
+-- Friends who turn on you, and forgiving ----------------------------------------------------
+
+test("a party member who turns on me isn't a grudge", function()
+    UnitInParty = function(u) return u == "nameplate1" end
+    TARGETNAME = "Cursed"
+    TICK()
+    NOWT = NOWT + 5
+    FIRE("PLAYER_DEAD")
+    eq(DB.grudges.Cursed, nil, "grudge on a party member")
+    UnitInParty = nil
+    TARGETNAME = "Stabby"
+end)
+
+test("a guildie who turns on me isn't a grudge either", function()
+    DB.guildies.Turncoat = { t = time() }
+    TARGETNAME = "Turncoat"
+    TICK()
+    NOWT = NOWT + 5
+    FIRE("PLAYER_DEAD")
+    eq(DB.grudges.Turncoat, nil, "grudge on a guildie")
+    DB.guildies.Turncoat = nil
+    TARGETNAME = "Stabby"
+end)
+
+test("forgiving drops the grudge and takes the poster down", function()
+    DB.grudges["Rose-Go"] = { kills = 1, revenge = 0, first = time(), zone = "Hillsbrad Foothills" }
+    DB.posters["Rose-Go"] = { reward = 0, t = time() }
+    ADDONMSG = {}
+    eq(NS.Forgive("Rose"), "Rose-Go", "found by short name")
+    eq(DB.grudges["Rose-Go"], nil, "grudge kept")
+    eq(DB.posters["Rose-Go"].done, true, "poster still up")
+    assert(Sent("^W~Rose%-Go$"), "guild not told: " .. table.concat(ADDONMSG, " / "))
+    eq(NS.Forgive("Nobody"), nil, "forgave a stranger")
+    PRINTED = {}
+    SlashCmdList.FOREVERTOLD("forgive Nobody")
+    assert(table.concat(PRINTED, " "):find("Usage: /told forgive"), "no usage hint")
+end)
+
+test("right-clicking a grudge forgives it", function()
+    DB.grudges.Clicky = { kills = 1, revenge = 0, first = time(), zone = "Duskwood", class = "Rogue", classFile = "ROGUE" }
+    local row = Find(Rows("grudges"), "^Clicky$")
+    assert(row and row.onClick, "no Clicky row")
+    row.onClick("LeftButton")
+    assert(DB.grudges.Clicky, "a left click forgave")
+    row.onClick("RightButton")
+    eq(DB.grudges.Clicky, nil, "right click didn't forgive")
+end)
+
+test("old grudges on guildies are forgiven", function()
+    DB.grudges["Vatic-Cane"] = { kills = 1, revenge = 0, first = time(), zone = "Shadowfang Keep" }
+    DB.guildies.Vatic = { t = time(), level = 25 }
+    NS.ForgiveGuildies()
+    eq(DB.grudges["Vatic-Cane"], nil, "grudge on a guildie kept")
+    DB.guildies.Vatic = nil
+end)
+
+test("my own echoed posters leave the board", function()
+    DB.bounties["Vatic-Cane"] = { posters = { ["Craig"] = { kills = 1, ours = 0, t = time() } }, since = time(), t = time() }
+    NS.TidyNames()
+    eq(DB.bounties["Vatic-Cane"], nil, "my own echo still on the board")
+end)
+
+test("the hall keeps my last real zone while logging out", function()
+    local h = ForeverToldAccountDB.heroes["Craig-Stormrage"]
+    h.zone = "Elwynn Forest"
+    local saved = GetRealZoneText
+    GetRealZoneText = function() return "" end
+    NS.SaveHero()
+    eq(h.zone, "Elwynn Forest", "zone in the hall")
+    GetRealZoneText = saved
+end)
+
 -- Pages ---------------------------------------------------------------------------------
 
 test("every page opens", function()

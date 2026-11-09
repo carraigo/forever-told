@@ -33,7 +33,9 @@ function ns.SaveHero()
     h.class, h.classFile = className, classFile
     h.race = UnitRace and UnitRace("player") or h.race
     h.level = UnitLevel("player")
-    h.zone = ns.Zone()
+    -- While logging out the game may have no zone name; keep the last real one.
+    local zone = ns.Zone()
+    if zone ~= ns.UNKNOWN_ZONE or not h.zone then h.zone = zone end
     h.quests = DB.quests
     h.deeds = U.Count(DB.deeds)
     h.places = U.Count(DB.zones)

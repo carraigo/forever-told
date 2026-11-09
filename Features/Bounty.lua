@@ -142,6 +142,12 @@ function ns.PostBounty(name)
     end
 end
 
+-- Take my poster down from the guild's boards.
+function ns.WithdrawBounty(name)
+    if not IsInGuild() then return end
+    Send("W~" .. name)
+end
+
 -- Send all my open bounties, spaced out so we never flood the channel.
 local function SendAll()
     local DB = ns.DB
@@ -405,8 +411,15 @@ local function TidyNames()
     DB.guildies = DB.guildies or {}
     Refile(DB.guildies, Short)
     DB.guildies[Short(me)] = nil
-    for _, b in pairs(DB.bounties) do
-        if b.posters then Refile(b.posters, function(n) return n end) end
+    for name, b in pairs(DB.bounties) do
+        if b.posters then
+            Refile(b.posters, function(n) return n end)
+            -- Our own posters came back as an echo too; ours live with the grudges.
+            for poster in pairs(b.posters) do
+                if Short(poster) == Short(me) then b.posters[poster] = nil end
+            end
+            if not next(b.posters) then DB.bounties[name] = nil end
+        end
     end
 end
 ns.TidyNames = TidyNames
@@ -430,6 +443,7 @@ ns.On("PLAYER_ENTERING_WORLD", function()
     -- don't look guilded yet, rather than staying silent all session.
     local function Greet(tries)
         if IsInGuild() then
+            if ns.ForgiveGuildies then ns.ForgiveGuildies() end
             Hello()
             SendAll()
         elseif tries > 0 then

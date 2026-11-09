@@ -1,3 +1,13 @@
+## v1.1.6
+
+**Fixes**
+- No more grudges against your own group or guild. If a party member, raid member or guildie turns on you for a moment (Arugal's Curse in Shadowfang Keep, a mind control) and you die, it isn't counted as a gank and no wanted poster goes up. Grudges an older version made against guildies are forgiven at login, and their posters come down from the guild's boards.
+- Your own wanted posters no longer echo back onto your bounty board as if someone else had posted them.
+- The Hall of Heroes keeps your last real zone instead of saying "somewhere unknown" when you log out mid-loading screen.
+
+**New**
+- Forgive a grudge: right-click it on the Grudges page, or type `/told forgive <name>`. The grudge is forgotten and your wanted poster comes down from the guild's boards.
+
 ## v1.1.5
 
 **Fixes**
