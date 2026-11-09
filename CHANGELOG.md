@@ -1,3 +1,12 @@
+## v1.2.0
+
+**New**
+- Forever Told keeps its own error log. WoW Forever doesn't save Lua errors anywhere, so now when part of Forever Told goes wrong it writes the error down (one line per error, with a count, version and character), tells you once in chat, and carries on with everything else. Type `/told errors` to see them, or `/told errors clear` to empty the log. Errors still go to the game's error display or BugSack as before.
+
+**Fixes**
+- Dungeon runs from before 1.1.5 move to the right dungeon. Runs that were counted under the zone outside the door (Orgrimmar for Ragefire Chasm, Silverpine Forest for Shadowfang Keep, the cave outside Wailing Caverns) are moved to the dungeon, once, as long as you've only been in one dungeon with its door there. Your total number of runs doesn't change.
+- Stats page: fastest and slowest level now count from level 10, so the minutes-long early levels don't always win "fastest".
+
 ## v1.1.6
 
 **Fixes**

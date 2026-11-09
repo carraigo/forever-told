@@ -6,6 +6,7 @@ local U, S, K = ns.U, ns.Skin, ns.PageKit
 local C = S.colours
 local Count, Duration, Plural, Number = U.Count, U.Duration, U.Plural, U.Number
 local RED, ChapterTitle, GrudgeTotals = K.RED, K.ChapterTitle, K.GrudgeTotals
+local FIRST_REAL_LEVEL = 10 -- earlier levels take minutes, so they sit out fastest and slowest
 
 local CLASSIFICATION = { elite = "elite", rareelite = "rare elite", rare = "rare", worldboss = "boss" }
 local TOP = 5
@@ -102,15 +103,22 @@ ns.Pages.stats = {
         local race = UnitRace and UnitRace("player") or ""
         stat("Character", ("%s, level %d %s %s"):format(UnitName("player"), UnitLevel("player"), race, (UnitClass("player"))))
         local total, n, fastest, slowest = 0, 0, nil, nil
+        -- The first few levels take minutes; once there's a level 10 or later, only
+        -- those race for fastest and slowest.
+        local from = 1
+        for lvl in pairs(DB.levelTimes) do if lvl >= FIRST_REAL_LEVEL then from = FIRST_REAL_LEVEL end end
         for lvl, sec in pairs(DB.levelTimes) do
             total, n = total + sec, n + 1
-            if not fastest or sec < DB.levelTimes[fastest] then fastest = lvl end
-            if not slowest or sec > DB.levelTimes[slowest] then slowest = lvl end
+            if lvl >= from then
+                if not fastest or sec < DB.levelTimes[fastest] or (sec == DB.levelTimes[fastest] and lvl < fastest) then fastest = lvl end
+                if not slowest or sec > DB.levelTimes[slowest] or (sec == DB.levelTimes[slowest] and lvl < slowest) then slowest = lvl end
+            end
         end
         if n > 0 then
             stat("Average level", Duration(total / n))
-            stat("Fastest level", ("%d to %d in %s"):format(fastest, fastest + 1, Duration(DB.levelTimes[fastest])))
-            stat("Slowest level", ("%d to %d in %s"):format(slowest, slowest + 1, Duration(DB.levelTimes[slowest])))
+            local note = from > 1 and (" (from level %d)"):format(from) or ""
+            stat("Fastest level" .. note, ("%d to %d in %s"):format(fastest, fastest + 1, Duration(DB.levelTimes[fastest])))
+            stat("Slowest level" .. note, ("%d to %d in %s"):format(slowest, slowest + 1, Duration(DB.levelTimes[slowest])))
         elseif not played then
             stat("Time per level", "log in again to start measuring")
         end

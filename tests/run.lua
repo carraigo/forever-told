@@ -88,7 +88,7 @@ print("Forever Told tests")
 -- Upgrades -----------------------------------------------------------------------------
 
 test("upgrades run once and tidy old data", function()
-    eq(DB.version, 6, "version")
+    eq(DB.version, 7, "version")
     eq(DB.zones["somewhere unknown"], nil, "\"somewhere unknown\" isn't a place")
     eq(DB.zoneStats["somewhere unknown"], nil, "nor does it keep time")
     eq(DB.zones["Wailing Caverns"].instance, true, "a zone with a boss kill is a dungeon")
@@ -734,6 +734,74 @@ test("the hall keeps my last real zone while logging out", function()
     NS.SaveHero()
     eq(h.zone, "Elwynn Forest", "zone in the hall")
     GetRealZoneText = saved
+end)
+
+-- 1.2.0: run repair, error log, fastest level ------------------------------------------------
+
+test("old runs filed under a dungeon's door move to the dungeon", function()
+    local fake = {
+        zones = { ["Ragefire Chasm"] = { instance = true }, ["Wailing Caverns"] = { instance = true },
+            ["Razorfen Kraul"] = { instance = true }, Orgrimmar = {}, ["The Barrens"] = {}, ["The Wailing Caverns"] = {} },
+        counters = { runZones = { Orgrimmar = 2, ["Ragefire Chasm"] = 2, ["The Wailing Caverns"] = 2,
+            ["Silverpine Forest"] = 1, ["The Barrens"] = 1 } },
+    }
+    eq(NS.RepairRuns(fake), 4, "runs moved")
+    local runs = fake.counters.runZones
+    eq(runs["Ragefire Chasm"], 4, "Orgrimmar's runs")
+    eq(runs.Orgrimmar, nil, "Orgrimmar still has runs")
+    eq(runs["Wailing Caverns"], 2, "the cave's runs")
+    eq(runs["Silverpine Forest"], 1, "moved to a dungeon never visited")
+    eq(runs["The Barrens"], 1, "guessed between two dungeons")
+end)
+
+test("errors are written down, and the rest still runs", function()
+    local handler = geterrorhandler
+    geterrorhandler = nil
+    ForeverToldAccountDB.errors = {}
+    local after = 0
+    NS.On("FT_TEST_EVENT", function() error("Pages/Fake.lua:12: boom") end)
+    NS.On("FT_TEST_EVENT", function() after = after + 1 end)
+    PRINTED = {}
+    FIRE("FT_TEST_EVENT")
+    FIRE("FT_TEST_EVENT")
+    geterrorhandler = handler
+    eq(after, 2, "later handlers skipped")
+    local list = ForeverToldAccountDB.errors
+    eq(#list, 1, "one distinct error")
+    eq(list[1].count, 2, "count")
+    eq(list[1].where, "FT_TEST_EVENT", "where")
+    assert(list[1].text:find("boom"), "text")
+    local warned = 0
+    for _, line in ipairs(PRINTED) do if line:find("/told errors") then warned = warned + 1 end end
+    eq(warned, 1, "warned once")
+    PRINTED = {}
+    SlashCmdList.FOREVERTOLD("errors")
+    assert(table.concat(PRINTED, "\n"):find("x2.*boom"), "not listed: " .. table.concat(PRINTED, " / "))
+    SlashCmdList.FOREVERTOLD("errors clear")
+    eq(#ForeverToldAccountDB.errors, 0, "not cleared")
+    NS.listeners.FT_TEST_EVENT = nil
+end)
+
+test("an error still reaches the game's error handler", function()
+    NS.On("FT_TEST_EVENT", function() error("still loud") end)
+    local ok, err = pcall(FIRE, "FT_TEST_EVENT")
+    assert(not ok and tostring(err):find("still loud"), "error hidden")
+    NS.listeners.FT_TEST_EVENT = nil
+    ForeverToldAccountDB.errors = {}
+end)
+
+test("fastest and slowest level skip the first few minutes-long levels", function()
+    local saved = DB.levelTimes
+    DB.levelTimes = { [2] = 60, [10] = 3000, [11] = 2000, [12] = 9000 }
+    local rows = Rows("stats")
+    local fast, slow = Find(rows, "^Fastest level"), Find(rows, "^Slowest level")
+    assert(fast and fast.value:find("^11 to 12"), "fastest: " .. tostring(fast and fast.value))
+    assert(slow and slow.value:find("^12 to 13"), "slowest: " .. tostring(slow and slow.value))
+    eq(fast.label, "Fastest level (from level 10)", "label")
+    DB.levelTimes = { [2] = 60, [3] = 300 }
+    fast = Find(Rows("stats"), "^Fastest level")
+    assert(fast and fast.label == "Fastest level" and fast.value:find("^2 to 3"), "early levels only")
+    DB.levelTimes = saved
 end)
 
 -- Pages ---------------------------------------------------------------------------------
