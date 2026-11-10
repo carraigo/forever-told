@@ -121,3 +121,6 @@ C_Timer = { After = function(_, f) f() end, NewTicker = function(_, f) TICKS[#TI
 
 ReloadUI = function() RELOADED = true end
 GetRealmName = function() return "Stormrage" end
+
+-- An error in the addon should still fail the test that caused it.
+geterrorhandler = function() return function(e) error(e, 0) end end

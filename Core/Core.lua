@@ -10,6 +10,8 @@
 --   /told shots|banner|minimap|time|alerts|bounty|milestones|rare   flip a setting
 --   /told export|import   back up your story, or bring one back
 --   /told epitaph         the Hardcore memorial stone (or how it would read)
+--   /told forgive <name>  let a grudge go and take your poster down
+--   /told errors          Lua errors Forever Told has hit (/told errors clear)
 
 local ADDON, ns = ...
 local U = ns.U
@@ -21,6 +23,64 @@ local GOLD = 10000 -- copper
 function ns.Print(msg) print(PREFIX .. " " .. msg) end
 local Print = ns.Print
 local Pick, issecret = U.Pick, U.issecret
+
+-- Errors --------------------------------------------------------------------------------
+-- WoW Forever doesn't keep Lua errors anywhere, so Forever Told writes down its
+-- own: one line per distinct error, with a count, for every character.
+local ERRORS_KEPT = 25
+
+local function Version()
+    local get = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
+    local ok, v = pcall(get or error, ADDON, "Version")
+    return ok and type(v) == "string" and v or "?"
+end
+
+local warned
+function ns.LogError(where, err)
+    local text = issecret(err) and "<secret value>" or tostring(err)
+    text = text:gsub("^Interface[/\\]AddOns[/\\]ForeverTold[/\\]", ""):sub(1, 300)
+    ForeverToldAccountDB = ForeverToldAccountDB or {}
+    local ADB = ForeverToldAccountDB
+    ADB.errors = ADB.errors or {}
+    local list, now = ADB.errors, time()
+    local e
+    for _, old in ipairs(list) do if old.text == text then e = old end end
+    if e then
+        e.count, e.last, e.where = e.count + 1, now, where
+    else
+        local name = UnitName and UnitName("player")
+        e = { text = text, where = where, count = 1, first = now, last = now, version = Version(), who = type(name) == "string" and name or nil }
+        list[#list + 1] = e
+        while #list > ERRORS_KEPT do table.remove(list, 1) end
+    end
+    if not warned then
+        warned = true
+        Print("hit a Lua error. Type /told errors to see it.")
+    end
+    -- Still hand it to the game (or BugSack), as before.
+    if geterrorhandler then geterrorhandler()(err) end
+end
+
+-- Runs fn, and writes down anything that goes wrong instead of stopping the rest.
+function ns.Guard(where, fn, ...)
+    local ok, err = pcall(fn, ...)
+    if not ok then ns.LogError(where, err) end
+end
+
+function ns.ErrorReport(arg)
+    local list = ForeverToldAccountDB and ForeverToldAccountDB.errors or {}
+    if arg == "clear" then
+        if ForeverToldAccountDB then ForeverToldAccountDB.errors = {} end
+        Print("Error log cleared.")
+        return
+    end
+    if #list == 0 then Print("No Lua errors written down. All quiet.") return end
+    Print(("%d distinct Lua error%s (newest last). /told errors clear to empty the log."):format(#list, #list == 1 and "" or "s"))
+    for _, e in ipairs(list) do
+        print(("  %s x%d, %s, v%s%s: %s"):format(date("%d %b %H:%M", e.last), e.count, e.where or "?", e.version or "?",
+            e.who and (", " .. e.who) or "", e.text))
+    end
+end
 
 -- Several modules can listen to the same event.
 ns.listeners = {}
@@ -37,10 +97,7 @@ function ns.Listen(name, fn)
     table.insert(signals[name], fn)
 end
 function ns.Emit(name, ...)
-    for _, fn in ipairs(signals[name] or {}) do
-        local ok, err = pcall(fn, ...)
-        if not ok and geterrorhandler then geterrorhandler()(err) end
-    end
+    for _, fn in ipairs(signals[name] or {}) do ns.Guard(name, fn, ...) end
 end
 
 -- Per-chapter tallies for the chapter recap. Chapter 0 is levels 1-9.
@@ -307,6 +364,59 @@ local VALUES = { quests = 0, deaths = 0, shots = 0, epics = 0, goldPeak = 0, loo
 -- runs once per character. Add new ones to the end; never reorder them.
 local function IsTest(name) return type(name) == "string" and name:find("-Testrealm", 1, true) ~= nil end
 
+-- Where each dungeon's door is: the zone the game could still name on the loading
+-- screen in, before 1.1.5. Used once to move those runs to the right dungeon.
+local DUNGEON_DOORS = {
+    ["Orgrimmar"] = { "Ragefire Chasm" },
+    ["Durotar"] = { "Ragefire Chasm" },
+    ["The Barrens"] = { "Wailing Caverns", "Razorfen Kraul", "Razorfen Downs" },
+    ["The Wailing Caverns"] = { "Wailing Caverns" },
+    ["Westfall"] = { "The Deadmines", "Deadmines" },
+    ["Stormwind City"] = { "The Stockade", "Stormwind Stockade" },
+    ["Silverpine Forest"] = { "Shadowfang Keep" },
+    ["Ashenvale"] = { "Blackfathom Deeps" },
+    ["Dun Morogh"] = { "Gnomeregan" },
+    ["Undercity"] = { "Ruins of Lordaeron" },
+    ["Tirisfal Glades"] = { "Scarlet Monastery", "Ruins of Lordaeron" },
+    ["Desolace"] = { "Maraudon" },
+    ["Badlands"] = { "Uldaman" },
+    ["Tanaris"] = { "Zul'Farrak" },
+    ["Swamp of Sorrows"] = { "The Temple of Atal'Hakkar", "Sunken Temple" },
+    ["Feralas"] = { "Dire Maul" },
+    ["Searing Gorge"] = { "Blackrock Depths", "Blackrock Spire", "Lower Blackrock Spire" },
+    ["Burning Steppes"] = { "Blackrock Depths", "Blackrock Spire", "Lower Blackrock Spire" },
+    ["Western Plaguelands"] = { "Scholomance" },
+    ["Eastern Plaguelands"] = { "Stratholme" },
+}
+ns.DUNGEON_DOORS = DUNGEON_DOORS
+
+-- Moves runs filed under a dungeon's door to the dungeon, when only one dungeon
+-- we've been in has its door there. Anything unclear stays where it is.
+function ns.RepairRuns(DB)
+    local runs = DB.counters and DB.counters.runZones
+    if not runs then return 0 end
+    local moved = 0
+    local keys = {}
+    for zone in pairs(runs) do keys[#keys + 1] = zone end
+    for _, zone in ipairs(keys) do
+        local info = DB.zones[zone]
+        local doors = DUNGEON_DOORS[zone]
+        if doors and not (info and info.instance) then
+            local only, found = nil, 0
+            for _, dungeon in ipairs(doors) do
+                local d = DB.zones[dungeon]
+                if d and d.instance and dungeon ~= only then only, found = dungeon, found + 1 end
+            end
+            if found == 1 then
+                runs[only] = (runs[only] or 0) + runs[zone]
+                moved = moved + runs[zone]
+                runs[zone] = nil
+            end
+        end
+    end
+    return moved
+end
+
 local MIGRATIONS = {
     -- 1. Version 0.1 stored a bare timestamp per zone.
     function(DB)
@@ -367,6 +477,8 @@ local MIGRATIONS = {
             if info then info.instance = true end
         end
     end,
+    -- 7. Version 1.2.0: dungeon runs filed under the zone outside move to the dungeon.
+    function(DB) ns.RepairRuns(DB) end,
 }
 
 local function InitDB()
@@ -415,7 +527,7 @@ frame:SetScript("OnEvent", function(self, event, ...)
     end
     local list = ns.listeners[event]
     if list then
-        for _, fn in ipairs(list) do fn(...) end
+        for _, fn in ipairs(list) do ns.Guard(event, fn, ...) end
     end
 end)
 
@@ -473,6 +585,9 @@ SlashCmdList.FOREVERTOLD = function(msg)
         return
     elseif cmd == "epitaph" and ns.ShowEpitaph then
         ns.ShowEpitaph()
+        return
+    elseif cmd == "errors" then
+        ns.ErrorReport(rest:lower())
         return
     elseif cmd == "forgive" and ns.Forgive then
         local key = rest ~= "" and ns.Forgive(rest)
