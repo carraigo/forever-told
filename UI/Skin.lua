@@ -414,8 +414,8 @@ function S.List(parent)
 
     -- Small epitaph stones, side by side; click one for the full stone.
     local STONE, INK = { 0.33, 0.33, 0.35, 1 }, { 0.86, 0.84, 0.78, 1 }
-    local function Carve(parent, size, font, alpha)
-        local fs = S.Text(parent, size, { INK[1], INK[2], INK[3], alpha or 1 }, font or S.CARVED)
+    local function Carve(into, size, font, alpha)
+        local fs = S.Text(into, size, { INK[1], INK[2], INK[3], alpha or 1 }, font or S.CARVED)
         fs:SetJustifyH("CENTER")
         fs:SetWidth(130)
         if fs.SetShadowColor then

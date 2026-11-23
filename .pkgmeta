@@ -7,6 +7,8 @@ manual-changelog:
 ignore:
   - media
   - tests
+  - docs
   - .github
+  - .luacheckrc
   - README.md
   - CHANGELOG.md

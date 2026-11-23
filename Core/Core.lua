@@ -12,6 +12,11 @@
 --   /told epitaph         the Hardcore memorial stone (or how it would read)
 --   /told forgive <name>  let a grudge go and take your poster down
 --   /told errors          Lua errors Forever Told has hit (/told errors clear)
+--   /told bug             a copyable bug report (version, memory, errors)
+--   /told perf            the profiler: /told perf on|off|reset, or its report
+--   /told selftest        check Forever Told works on this client
+--   /told new             what's new in this version
+--   /told version         the version you're running
 
 local ADDON, ns = ...
 local U = ns.U
@@ -34,6 +39,7 @@ local function Version()
     local ok, v = pcall(get or error, ADDON, "Version")
     return ok and type(v) == "string" and v or "?"
 end
+ns.Version = Version
 
 local warned
 function ns.LogError(where, err)
@@ -62,9 +68,30 @@ function ns.LogError(where, err)
 end
 
 -- Runs fn, and writes down anything that goes wrong instead of stopping the rest.
+-- While the profiler is on (/told perf on) it also times fn; off, it's a plain call.
+local clock = debugprofilestop or function() return os.clock() * 1000 end
+ns.clock = clock
 function ns.Guard(where, fn, ...)
+    if not ns.profiling then
+        local ok, err = pcall(fn, ...)
+        if not ok then ns.LogError(where, err) end
+        return
+    end
+    local start = clock()
     local ok, err = pcall(fn, ...)
+    ns.Charge(where, clock() - start)
     if not ok then ns.LogError(where, err) end
+end
+
+-- Errors not seen for two weeks are old news: they're dropped at login.
+local ERROR_EXPIRY = 14 * 86400
+function ns.ExpireErrors(now)
+    local list = ForeverToldAccountDB and ForeverToldAccountDB.errors
+    if not list then return end
+    now = now or time()
+    for i = #list, 1, -1 do
+        if now - (list[i].last or 0) > ERROR_EXPIRY then table.remove(list, i) end
+    end
 end
 
 function ns.ErrorReport(arg)
@@ -507,12 +534,18 @@ local function InitDB()
     DB.version = #MIGRATIONS
 end
 
+-- How long loading took, in ms, for /told bug: reading the saved data, and the
+-- first PLAYER_ENTERING_WORLD (where most features set themselves up).
+ns.startup = {}
+
 local frame = CreateFrame("Frame")
 frame:RegisterEvent("ADDON_LOADED")
 frame:SetScript("OnEvent", function(self, event, ...)
     if event == "ADDON_LOADED" then
         if ... ~= ADDON then return end
+        local start = clock()
         InitDB()
+        ns.ExpireErrors()
         for name, fn in pairs(handlers) do ns.On(name, fn) end
         for name in pairs(ns.listeners) do
             -- WoW Forever closes the combat log to addons: even asking for it
@@ -523,11 +556,15 @@ frame:SetScript("OnEvent", function(self, event, ...)
         end
         if ns.CreateMinimapButton then ns.CreateMinimapButton() end
         self:UnregisterEvent("ADDON_LOADED")
+        ns.startup.load = clock() - start
         return
     end
     local list = ns.listeners[event]
     if list then
+        local first = event == "PLAYER_ENTERING_WORLD" and not ns.startup.world
+        local start = first and clock()
         for _, fn in ipairs(list) do ns.Guard(event, fn, ...) end
+        if first then ns.startup.world = clock() - start end
     end
 end)
 
@@ -566,6 +603,9 @@ function ns.SetSetting(s, value)
 end
 
 -- Slash commands -----------------------------------------------------------------------
+-- Other files add their own words: ns.Commands.bug = function(rest) ... end
+
+ns.Commands = {}
 
 SLASH_FOREVERTOLD1 = "/told"
 SLASH_FOREVERTOLD2 = "/forevertold"
@@ -573,7 +613,10 @@ SlashCmdList.FOREVERTOLD = function(msg)
     local DB = ns.DB
     local cmd, rest = (msg or ""):match("^%s*(%S*)%s*(.-)%s*$")
     cmd = cmd:lower()
-    if cmd == "recent" then
+    if ns.Commands[cmd] then
+        ns.Commands[cmd](rest)
+        return
+    elseif cmd == "recent" then
         for i = math.max(1, #DB.entries - 9), #DB.entries do
             local e = DB.entries[i]
             Print(("[%d] %s"):format(e.lvl or 0, e.text))

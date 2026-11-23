@@ -1,7 +1,7 @@
 -- Deeds page: badges earned and still to earn.
 
 local _, ns = ...
-local U, S, K = ns.U, ns.Skin, ns.PageKit
+local U, S = ns.U, ns.Skin
 local C = S.colours
 local Count, Hex = U.Count, U.Hex
 

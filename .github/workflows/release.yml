@@ -1,0 +1,43 @@
+name: release
+# Push a tag like v1.3.0 to build ForeverTold-v1.3.0.zip and attach it to a GitHub release.
+# A tag with a dash, like v1.4.0-beta.1, makes a pre-release.
+on:
+  push:
+    tags: ["v*"]
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0  # all tags, to find the previous release
+      - run: sudo apt-get update && sudo apt-get install -y lua5.1 zip
+      - run: lua5.1 tests/run.lua
+      - name: Both TOCs carry the tag's version
+        run: |
+          v="${GITHUB_REF_NAME#v}"
+          for toc in ForeverTold.toc ForeverTold_Vanilla.toc; do
+            tr -d '\r' < "$toc" | grep -qx "## Version: $v" || { echo "$toc is not $v"; exit 1; }
+          done
+      - name: Zip the addon (what the game loads, nothing else)
+        run: |
+          mkdir -p .release/ForeverTold
+          cp -r Core Features Pages UI ForeverTold.toc ForeverTold_Vanilla.toc LICENSE .release/ForeverTold/
+          (cd .release && zip -r "../ForeverTold-${GITHUB_REF_NAME}.zip" ForeverTold)
+      - name: Release notes from CHANGELOG.md
+        # Every section since the previous release, so a version that was never tagged still shows up.
+        run: |
+          cur="${GITHUB_REF_NAME#v}"
+          prev=$(git tag --list 'v*' | grep -E '^v[0-9]+(\.[0-9]+)+$' | sed 's/^v//' | { cat; echo "$cur"; } | sort -uV | grep -B1 -x "$cur" | head -1)
+          [ "$prev" = "$cur" ] && prev=""
+          tr -d '\r' < CHANGELOG.md | awk -v cur="$cur" -v prev="$prev" '/^## v/ { v = substr($2, 2); if (v == cur) on = 1; else if (on && prev != "" && v == prev) exit } on' > notes.md
+          test -s notes.md || { echo "CHANGELOG.md has no '## v$cur' section"; exit 1; }
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          pre=""
+          case "$GITHUB_REF_NAME" in *-*) pre="--prerelease" ;; esac
+          gh release create "$GITHUB_REF_NAME" "ForeverTold-${GITHUB_REF_NAME}.zip" --title "Forever Told ${GITHUB_REF_NAME}" --notes-file notes.md $pre
