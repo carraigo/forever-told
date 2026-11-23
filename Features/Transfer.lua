@@ -283,6 +283,23 @@ local function CreateDialog()
     f:Hide()
 end
 
+-- Any text to copy (the bug report), in the same dialog.
+function ns.ShowCopy(title, hint, text)
+    if not dialog then CreateDialog() end
+    local f = dialog
+    f.mode = "copy"
+    f.backup, f.confirm = nil, false
+    f:Show()
+    f.title:SetText(title)
+    f.hint:SetText(hint)
+    f.action:Hide()
+    f.edit:SetText(text)
+    f.edit:SetFocus()
+    f.edit:HighlightText()
+    f.status:SetText(("%d characters"):format(#text))
+    f.status:SetTextColor(unpack(C.muted))
+end
+
 function ns.ShowTransfer(mode)
     if not dialog then CreateDialog() end
     local f = dialog

@@ -2,7 +2,6 @@
 
 local _, ns = ...
 local U, S, K = ns.U, ns.Skin, ns.PageKit
-local C = S.colours
 local Plural, Hex = U.Plural, U.Hex
 local view, Chapter, ChapterTitle, Empty = K.view, K.Chapter, K.ChapterTitle, K.Empty
 
@@ -53,10 +52,10 @@ ns.Pages.journal = {
             return Empty(#DB.entries == 0 and "Your story hasn't started yet. Go and explore!" or "Nothing here yet for this filter.")
         end
         local items, chapter = {}, nil
-        local e = DB.epitaph
-        if e then
+        local stone = DB.epitaph
+        if stone then
             items[#items + 1] = { text = "In memoriam", colour = { 0.86, 0.84, 0.78, 1 }, dot = { 0.72, 0.72, 0.75, 1 }, card = true,
-                sub = ("Fell at level %d in %s, %s"):format(e.lvl or 0, e.zone or "?", date("%d %B %Y", e.t)),
+                sub = ("Fell at level %d in %s, %s"):format(stone.lvl or 0, stone.zone or "?", date("%d %B %Y", stone.t)),
                 right = "view stone", onClick = function() ns.ShowEpitaph() end }
             items[#items + 1] = { type = "gap", size = 8 }
         end

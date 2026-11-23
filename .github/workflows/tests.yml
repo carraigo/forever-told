@@ -1,0 +1,18 @@
+name: tests
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: sudo apt-get update && sudo apt-get install -y lua5.1 luajit lua-check
+      - name: luacheck
+        run: luacheck .
+      - name: tests (Lua 5.1, the game's Lua)
+        run: lua5.1 tests/run.lua
+      - name: tests (LuaJIT)
+        run: luajit tests/run.lua
+      - name: speed test (5,000-entry journal, login bursts)
+        run: lua5.1 tests/speed.lua

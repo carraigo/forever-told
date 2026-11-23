@@ -9,8 +9,9 @@
 --   $~name~gold~hunter                             I paid the hunter the reward I promised
 --   S~name~where                                   I just saw this wanted player here
 --
---   H~since~classFile~level                        hello: please send me your bounties (and chronicle news)
---   I~classFile~level                              reply to a hello: I run Forever Told too
+--   H~since~classFile~level~version                hello: please send me your bounties (and chronicle news)
+--   I~classFile~level~version                      reply to a hello: I run Forever Told too
+-- (version was added in 1.3.0; older clients leave it out and ignore it.)
 --
 -- Other features add their own kinds through ns.GuildHandlers and ns.GuildSend.
 
@@ -45,12 +46,26 @@ local function Succeeded(ok, result)
     return ok and (result == nil or result == true or result == 0)
 end
 
+-- The game's own limit says "throttled" (Enum.SendAddonMessageResult 3 or 8) rather
+-- than sending: that message goes back to the front of the queue to try again.
+local THROTTLED = {}
+do
+    local r = Enum and Enum.SendAddonMessageResult
+    THROTTLED[(r and r.AddonMessageThrottle) or 3] = true
+    THROTTLED[(r and r.ChannelThrottle) or 8] = true
+end
+local RETRIES = 5
+
+-- Returns true when the game held the message back and it should be tried again.
 local function RawSend(msg)
     local send = (C_ChatInfo and C_ChatInfo.SendAddonMessage) or SendAddonMessage
     if not send then return end
     local ok, result = pcall(send, PREFIX, msg, "GUILD")
     if Succeeded(ok, result) then
         stats.sent = stats.sent + 1
+    elseif ok and THROTTLED[result] then
+        stats.throttled = (stats.throttled or 0) + 1
+        return true
     else
         stats.failed = stats.failed + 1
         stats.lastError = ok and tostring(result) or "error"
@@ -58,13 +73,27 @@ local function RawSend(msg)
 end
 
 local queue, tokens, lastRefill, waiting = {}, BURST, nil, false
+local retries = {}
 local function Pump()
     local now = GetTime()
     if lastRefill then tokens = math.min(BURST, tokens + (now - lastRefill)) end
     lastRefill = now
     while #queue > 0 and tokens >= 1 do
         tokens = tokens - 1
-        RawSend(table.remove(queue, 1))
+        local msg = table.remove(queue, 1)
+        if RawSend(msg) then
+            retries[msg] = (retries[msg] or 0) + 1
+            if retries[msg] <= RETRIES then
+                table.insert(queue, 1, msg)
+            else
+                retries[msg] = nil
+                stats.failed = stats.failed + 1
+                stats.lastError = "throttled"
+            end
+            tokens = 0 -- wait for the next refill before trying again
+            break
+        end
+        retries[msg] = nil
     end
     if #queue > 0 and not waiting then
         waiting = true
@@ -113,7 +142,7 @@ end
 local function Hello()
     local _, classFile = UnitClass("player")
     stats.helloAt = time()
-    Send(("H~%d~%s~%d"):format(ns.ChronicleSince and ns.ChronicleSince() or 0, classFile or "", UnitLevel("player") or 0))
+    Send(("H~%d~%s~%d~%s"):format(ns.ChronicleSince and ns.ChronicleSince() or 0, classFile or "", UnitLevel("player") or 0, ns.Version()))
 end
 
 -- The gold I've promised on my own wanted poster for this player.
@@ -316,11 +345,14 @@ local function OnMessage(prefix, msg, channel, sender)
     if kind == "H" then SawGuildie(sender, f[3], f[4])
     elseif kind == "I" then SawGuildie(sender, f[2], f[3])
     else SawGuildie(sender) end
+    if ns.VersionSeen then
+        if kind == "H" then ns.VersionSeen(f[5], sender) elseif kind == "I" then ns.VersionSeen(f[4], sender) end
+    end
     if ns.GuildHandlers[kind] then ns.GuildHandlers[kind](f, sender) end
     if kind == "H" then
         C_Timer.After(1 + math.random() * 4, function()
             local _, classFile = UnitClass("player")
-            Send(("I~%s~%d"):format(classFile or "", UnitLevel("player") or 0))
+            Send(("I~%s~%d~%s"):format(classFile or "", UnitLevel("player") or 0, ns.Version()))
             SendAll()
         end)
         if ns.Refresh then ns.Refresh() end
@@ -462,10 +494,10 @@ function ns.GuildReport()
         return
     end
     Hello()
-    Print(("Guild channel: %s. Sent %d message%s, %d failed%s. Heard %d from guildies%s."):format(
+    Print(("Guild channel: %s. Sent %d message%s, %d failed%s, %d held back by the game and resent. Heard %d from guildies%s."):format(
         stats.registered == false and ("|cffff6b5bnot registered (" .. tostring(stats.registerResult) .. ")|r") or "open",
         stats.sent, stats.sent == 1 and "" or "s", stats.failed,
-        stats.lastError and (" (last code " .. stats.lastError .. ")") or "",
+        stats.lastError and (" (last code " .. stats.lastError .. ")") or "", stats.throttled or 0,
         stats.heard, stats.lastSender and (", last from " .. stats.lastSender) or ""))
     local names = {}
     for _, g in ipairs(ns.Guildies()) do

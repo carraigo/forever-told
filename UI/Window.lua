@@ -13,6 +13,11 @@ local pages, nav = {}, {}
 local current = "journal"
 local search = {}            -- search text per page
 local needsRefresh = false
+local Wake -- starts the window's OnUpdate; it stops itself once there's nothing to do
+local function MarkDirty()
+    needsRefresh = true
+    if Wake then Wake() end
+end
 
 -- Search -----------------------------------------------------------------------------
 -- Every list page can be searched: rows that don't match are hidden, and so
@@ -66,7 +71,7 @@ local function Select(id)
     local def = ns.Pages[id]
     window.search:SetShown(not def.noSearch)
     window.search:SetText(search[id] or "")
-    ns.Refresh()
+    ns.RefreshNow()
 end
 
 local function CreateSidebar(f)
@@ -171,7 +176,7 @@ local function CreateHeader(f)
     f.search:SetPoint("TOPRIGHT", -46, -22)
     f.search:HookScript("OnTextChanged", function(self)
         search[current] = self:GetText() or ""
-        needsRefresh = true
+        MarkDirty()
     end)
 end
 
@@ -245,28 +250,46 @@ local function CreateWindow()
         pages[id] = p
     end
 
-    -- Refresh at most once a frame, after typing or resizing.
-    f:SetScript("OnSizeChanged", function() needsRefresh = true end)
-    f:SetScript("OnUpdate", function(self, elapsed)
+    -- Refresh at most once a frame, after typing or resizing. The OnUpdate only runs
+    -- while the window is fading in or has a refresh waiting, never while it sits idle.
+    local function Tick(self, elapsed)
         if self.fade and self.fade < 1 then
             self.fade = math.min(1, self.fade + (elapsed or 0.016) * 7)
             self:SetAlpha(self.fade)
         end
         if needsRefresh then
             needsRefresh = false
-            ns.Refresh()
+            ns.RefreshNow()
         end
-    end)
+        if (not self.fade or self.fade >= 1) and not needsRefresh then self:SetScript("OnUpdate", nil) end
+    end
+    Wake = function() f:SetScript("OnUpdate", Tick) end
+    f:SetScript("OnSizeChanged", MarkDirty)
     f:SetScript("OnShow", function(self)
         self.fade = 0
         self:SetAlpha(0)
-        ns.Refresh()
+        Wake()
+        ns.RefreshNow()
     end)
     f:SetScript("OnHide", S.HideTip)
     f:Hide()
 end
 
+-- Redraws the open page. Most callers use ns.Refresh, which waits for the next frame
+-- and redraws once however many times it's asked (a login burst of guild messages
+-- asked for a redraw each); ns.RefreshNow redraws straight away.
+local refreshQueued = false
 function ns.Refresh()
+    if not window or not window:IsShown() or refreshQueued then return end
+    if not (C_Timer and C_Timer.After) then return ns.RefreshNow() end
+    refreshQueued = true
+    C_Timer.After(0, function()
+        refreshQueued = false
+        ns.Guard("Refresh", ns.RefreshNow)
+    end)
+end
+
+function ns.RefreshNow()
     if not window or not window:IsShown() then return end
     UpdateSidebar()
     local def = ns.Pages[current]

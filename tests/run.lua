@@ -7,6 +7,16 @@ local ROOT = (arg and arg[0] or "tests/run.lua"):match("^(.-)tests[/\\]run%.lua$
 dofile(ROOT .. "tests/stubs.lua")
 unpack = unpack or table.unpack
 
+-- The version, as the game reads it from the TOC.
+local function ReadFile(path)
+    local f = assert(io.open(ROOT .. path, "rb"))
+    local s = f:read("*a"):gsub("\r", "")
+    f:close()
+    return s
+end
+TOC_VERSION = ReadFile("ForeverTold.toc"):match("## Version: (%S+)")
+C_AddOns = { GetAddOnMetadata = function(_, field) if field == "Version" then return TOC_VERSION end end }
+
 -- Load -----------------------------------------------------------------------------------
 
 NS = {}
@@ -448,7 +458,7 @@ test("a guildie with no milestones yet still shows up", function()
     local found
     for _, g in ipairs(NS.Guildies()) do if g.name == "Mira" then found = g end end
     assert(found and found.level == 7 and found.classFile == "PRIEST", "hello didn't add Mira")
-    assert(Sent("^I~WARRIOR~24$"), "didn't answer the hello: " .. table.concat(ADDONMSG, " / "))
+    assert(Sent("^I~WARRIOR~24~" .. TOC_VERSION:gsub("%.", "%%.") .. "$"), "didn't answer the hello: " .. table.concat(ADDONMSG, " / "))
     FIRE("CHAT_MSG_ADDON", "FTold1", "I~SHAMAN~5", "GUILD", "Tok-Realm")
     -- Both were heard in the same second, so either may come first.
     local rows = Rows("chronicle")
@@ -802,6 +812,160 @@ test("fastest and slowest level skip the first few minutes-long levels", functio
     fast = Find(Rows("stats"), "^Fastest level")
     assert(fast and fast.label == "Fastest level" and fast.value:find("^2 to 3"), "early levels only")
     DB.levelTimes = saved
+end)
+
+-- Diagnostics, release hygiene and speed ----------------------------------------------------
+
+local function Printed() return table.concat(PRINTED, "\n") end
+local function Quiet(fn)
+    local handler = geterrorhandler
+    geterrorhandler = nil
+    local ok, err = pcall(fn)
+    geterrorhandler = handler
+    if not ok then error(err, 0) end
+end
+
+test("both TOC files match, and the version has What's new notes", function()
+    eq(ReadFile("ForeverTold_Vanilla.toc"), ReadFile("ForeverTold.toc"), "the two TOCs differ")
+    eq(NS.NOTES[1].version, TOC_VERSION, "newest notes")
+    assert(ReadFile("CHANGELOG.md"):find("## v" .. TOC_VERSION, 1, true), "CHANGELOG.md has no ## v" .. TOC_VERSION)
+end)
+
+test("/told bug opens a report to copy", function()
+    SlashCmdList.FOREVERTOLD("bug")
+    local text = ForeverToldTransfer.edit.text
+    assert(text:find("^Forever Told " .. TOC_VERSION:gsub("%.", "%%.")), "version line: " .. tostring(text))
+    assert(text:find("\nSaved data: entries %d+ KB"), "sizes")
+    assert(text:find("\nGuild channel: registered"), "guild line")
+    assert(text:find("\nErrors: 0"), "errors line")
+    eq(ForeverToldTransfer.title.text, "Bug report", "title")
+end)
+
+test("profiler: off costs nothing, on times each event", function()
+    NS.Diag.stats = {}
+    FIRE("ZONE_CHANGED_NEW_AREA")
+    eq(next(NS.Diag.stats), nil, "timed while off")
+    SlashCmdList.FOREVERTOLD("perf on")
+    FIRE("ZONE_CHANGED_NEW_AREA")
+    assert(NS.Diag.stats.ZONE_CHANGED_NEW_AREA, "not timed while on")
+    PRINTED = {}
+    SlashCmdList.FOREVERTOLD("perf")
+    assert(Printed():find("ZONE_CHANGED_NEW_AREA: %d+ calls"), "report: " .. Printed())
+    SlashCmdList.FOREVERTOLD("perf off")
+    eq(NS.profiling, nil, "still on")
+    eq(ForeverToldAccountDB.profiling, nil, "remembered as on")
+    SlashCmdList.FOREVERTOLD("perf reset")
+    eq(next(NS.Diag.stats), nil, "not reset")
+end)
+
+test("a call the game blocks goes in the error log, other addons' don't", function()
+    ForeverToldAccountDB.errors = {}
+    Quiet(function()
+        FIRE("ADDON_ACTION_BLOCKED", "SomeOtherAddon", "CastSpellByName()")
+        FIRE("ADDON_ACTION_BLOCKED", "ForeverTold", "TargetUnit()")
+    end)
+    eq(#ForeverToldAccountDB.errors, 1, "errors")
+    eq(ForeverToldAccountDB.errors[1].text, "the game blocked TargetUnit()", "text")
+    ForeverToldAccountDB.errors = {}
+end)
+
+test("errors not seen for two weeks clear themselves", function()
+    ForeverToldAccountDB.errors = { { text = "old", count = 1, last = time() - DAY(15) }, { text = "new", count = 1, last = time() - DAY(2) } }
+    NS.ExpireErrors()
+    eq(#ForeverToldAccountDB.errors, 1, "kept")
+    eq(ForeverToldAccountDB.errors[1].text, "new", "the wrong one went")
+    ForeverToldAccountDB.errors = {}
+end)
+
+test("a guild message the game holds back is sent again, not lost", function()
+    local real = C_ChatInfo.SendAddonMessage
+    local refuse = 2
+    ADDONMSG = {}
+    C_ChatInfo.SendAddonMessage = function(p, m, c)
+        if refuse > 0 then refuse = refuse - 1 return 3 end -- Enum.SendAddonMessageResult.AddonMessageThrottle
+        return real(p, m, c)
+    end
+    local before = NS.GuildStats.throttled or 0
+    NS.GuildSend("S~Stabby~Duskwood")
+    C_ChatInfo.SendAddonMessage = real
+    eq(NS.GuildStats.throttled - before, 2, "held back")
+    eq(ADDONMSG[#ADDONMSG], "S~Stabby~Duskwood", "never sent")
+end)
+
+test("you're told once when a guildie has a newer version", function()
+    PRINTED = {}
+    FIRE("CHAT_MSG_ADDON", "FTold1", "I~MAGE~20~1.0.0", "GUILD", "Old-Realm")
+    FIRE("CHAT_MSG_ADDON", "FTold1", "I~MAGE~20~99.0.0-beta1", "GUILD", "Tester-Realm")
+    FIRE("CHAT_MSG_ADDON", "FTold1", "I~MAGE~20", "GUILD", "Older-Realm")
+    eq(Printed():find("has Forever Told"), nil, "told about an older, beta or missing version")
+    FIRE("CHAT_MSG_ADDON", "FTold1", "I~MAGE~20~99.0.0", "GUILD", "Newer-Realm")
+    FIRE("CHAT_MSG_ADDON", "FTold1", "I~MAGE~20~99.1.0", "GUILD", "Newest-Realm")
+    local n = 0
+    for _, line in ipairs(PRINTED) do if line:find("has Forever Told 99") then n = n + 1 end end
+    eq(n, 1, "times told")
+    assert(Printed():find("Newer has Forever Told 99%.0%.0"), Printed())
+end)
+
+test("versions compare by number", function()
+    eq(NS.NewerVersion("1.10.0", "1.9.2"), true, "1.10 > 1.9")
+    eq(NS.NewerVersion("1.3", "1.3.0"), false, "equal")
+    eq(NS.NewerVersion("?", "1.0"), false, "not a version")
+end)
+
+test("an update says so once, a first install doesn't", function()
+    ForeverToldAccountDB.seenVersion = nil
+    PRINTED = {}
+    FIRE("PLAYER_LOGIN")
+    eq(Printed():find("updated to"), nil, "first install")
+    eq(ForeverToldAccountDB.seenVersion, TOC_VERSION, "remembered")
+    ForeverToldAccountDB.seenVersion = "1.1.0"
+    FIRE("PLAYER_LOGIN")
+    assert(Printed():find("updated to " .. TOC_VERSION:gsub("%.", "%%.")), Printed())
+    PRINTED = {}
+    FIRE("PLAYER_LOGIN")
+    eq(Printed():find("updated to"), nil, "said twice")
+    SlashCmdList.FOREVERTOLD("new")
+    assert(Printed():find("What's new in " .. TOC_VERSION:gsub("%.", "%%.")), "/told new: " .. Printed())
+end)
+
+test("/told selftest passes on a client with everything", function()
+    PRINTED = {}
+    SlashCmdList.FOREVERTOLD("selftest")
+    assert(Printed():find("Self%-test passed"), Printed())
+end)
+
+test("the game's Options get a Forever Told page", function()
+    local registered
+    Settings = { RegisterCanvasLayoutCategory = function(panel, name) return { panel = panel, name = name } end,
+        RegisterAddOnCategory = function(c) registered = c end }
+    NS.RegisterOptions()
+    Settings = nil
+    eq(registered and registered.name, "Forever Told", "category")
+end)
+
+test("a burst of refreshes redraws the open page once", function()
+    NS.Open("journal")
+    local later = {}
+    local after = C_Timer.After
+    C_Timer.After = function(_, fn) later[#later + 1] = fn end
+    local draws = 0
+    local real = NS.RefreshNow
+    NS.RefreshNow = function() draws = draws + 1 return real() end
+    for _ = 1, 20 do NS.Refresh() end
+    C_Timer.After = after
+    eq(#later, 1, "queued redraws")
+    later[1]()
+    NS.RefreshNow = real
+    eq(draws, 1, "redraws")
+end)
+
+test("the window has no per-frame work once it's idle", function()
+    NS.Open("journal")
+    local f = ForeverToldFrame
+    local tick = f.scripts.OnUpdate
+    assert(tick, "no fade-in after opening")
+    tick(f, 1)
+    eq(f.scripts.OnUpdate, nil, "OnUpdate still running when idle")
 end)
 
 -- Pages ---------------------------------------------------------------------------------

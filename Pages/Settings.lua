@@ -1,7 +1,7 @@
 -- Settings page: built from ns.SETTINGS, plus window size and backups.
 
 local _, ns = ...
-local U, S, K = ns.U, ns.Skin, ns.PageKit
+local S = ns.Skin
 local C = S.colours
 
 ns.Pages.settings = {

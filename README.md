@@ -2,6 +2,10 @@
 
 # Forever Told
 
+[![Tests](https://github.com/carraigo/forever-told/actions/workflows/tests.yml/badge.svg)](https://github.com/carraigo/forever-told/actions/workflows/tests.yml)
+[![Latest release](https://img.shields.io/github/v/release/carraigo/forever-told?label=release)](https://github.com/carraigo/forever-told/releases/latest)
+![WoW: Forever and Classic Era](https://img.shields.io/badge/WoW-Forever%20%C2%B7%20Classic%20Era-c9a227)
+
 ### *Your story, forever told.*
 
 Forever Told writes your adventure down as you play. Every new zone, every level, every boss and every friend goes into a living journal, grouped into chapters as you climb to 60.
@@ -87,7 +91,7 @@ A flat, dark window with sidebar navigation, card-style lists, hover details and
 
 ## Installing
 
-1. Download the latest release (or **Code → Download ZIP** on this page).
+1. Download `ForeverTold-vX.Y.Z.zip` from the [latest release](https://github.com/carraigo/forever-told/releases/latest) (not the "Source code" zips).
 2. Put the files in a folder named exactly `ForeverTold` inside your AddOns folder, for example `World of Warcraft\_classic_era_\Interface\AddOns\ForeverTold\`. `ForeverTold.toc` should sit directly inside it.
 3. Restart the game, or type `/reload`, and type `/told`.
 
@@ -104,8 +108,14 @@ A flat, dark window with sidebar navigation, card-style lists, hover details and
 | `/told epitaph` | Show the Hardcore memorial stone |
 | `/told guild` | Say hello to your guild and check the guild channel: who else runs Forever Told, messages sent and heard |
 | `/told alerts` · `bounty` · `milestones` · `shots` · `banner` · `time` · `rare` · `minimap` | Turn a setting on or off |
+| `/told forgive <name>` | Let a grudge go and take your poster down |
+| `/told errors` · `errors clear` | The Lua errors Forever Told has written down, or empty the log |
+| `/told bug` | A bug report to copy: version, client, memory, load times and errors |
+| `/told perf on` · `off` · `reset` · `/told perf` | Turn the profiler on or off, reset it, or list the slowest handlers |
+| `/told selftest` | Check Forever Told works on your client |
+| `/told new` · `version` | What's new in this version, or which version you have |
 
-`/forevertold` works too.
+`/forevertold` works too. Forever Told also has a page in the game's Options, under AddOns.
 
 ## Good to know
 
@@ -119,25 +129,28 @@ A flat, dark window with sidebar navigation, card-style lists, hover details and
 
 | Folder | What's in it |
 |---|---|
-| `Core` | Saved data, upgrades, settings, slash commands and the journal itself |
+| `Core` | Saved data, upgrades, settings, slash commands, the journal itself and diagnostics |
 | `Features` | What the addon tracks: fellowship, deeds, recaps, grudges, places, foes, bounties, the guild chronicle, backups, the epitaph and the Hall of Heroes |
 | `UI` | The widget kit, main window, pop-ups, minimap button and wanted posters |
 | `Pages` | One file per page of the journal window |
-| `tests` | Automated tests (not shipped in the addon) |
+| `tests` | Automated tests and a speed test (not shipped in the addon) |
+| `docs` | [How it works](docs/ARCHITECTURE.md): events, saved data, the guild channel, tests and releasing (not shipped) |
 | `media` | Logos for CurseForge and this page (not shipped) |
 
 ## Running the tests
 
-The tests load the addon outside the game with stand-in WoW functions and play fake events at it. With Lua 5.4 installed, from the repository root:
+The tests load the addon outside the game with stand-in WoW functions and play fake events at it. The speed test builds a 5,000-entry journal and a busy guild, and fails if anything gets slow enough to hitch the game. From the repository root, with Lua 5.1 (the game's Lua) and luacheck installed:
 
 ```
-lua tests/run.lua
+luacheck .
+lua5.1 tests/run.lua
+lua5.1 tests/speed.lua
 ```
 
-GitHub runs them on every push too.
+GitHub runs all three on every push. [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) explains how the addon fits together and how to release.
 
 ---
 
 **Author:** SMUGDUCK
 
-*Found a bug or have an idea? Open an issue on this repository. Red error text from BugSack helps a lot.*
+*Found a bug or have an idea? [Open an issue](https://github.com/carraigo/forever-told/issues/new/choose). Type `/told bug` in game and paste what it shows: it has your version and any errors, so there's no red text to copy by hand.*

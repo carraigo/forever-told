@@ -28,19 +28,38 @@ local heard = {} -- key -> GetTime() we last heard it on the channel
 local function Key(e) return ("%s|%d|%s|%s"):format(Short(e.who), e.t, e.kind, U.Plain(tostring(e.a or ""))) end
 local function Clean(v) return (tostring(v or ""):gsub("~", "-")) end
 
+-- The keys of the stored entries, so a new one is checked in one look instead of
+-- building every stored entry's key again (a login burst of guild news did that
+-- 300 times per message). Rebuilt whenever the list was changed somewhere else.
+local index, indexed, indexedCount = {}, nil, 0
+local function Index()
+    local list = ns.DB.chronicle
+    if indexed ~= list or indexedCount ~= #list then
+        index = {}
+        for _, e in ipairs(list) do index[Key(e)] = true end
+        indexed, indexedCount = list, #list
+    end
+    return index
+end
+
 local function Prune()
     local list, now = ns.DB.chronicle, time()
+    local keys = Index()
     for i = #list, 1, -1 do
-        if now - list[i].t > KEEP then table.remove(list, i) end
+        if now - list[i].t > KEEP then keys[Key(list[i])] = nil table.remove(list, i) end
     end
-    while #list > LIMIT do table.remove(list, 1) end
+    while #list > LIMIT do keys[Key(list[1])] = nil table.remove(list, 1) end
+    indexedCount = #list
 end
 
 -- Store an entry once, oldest first.
 local function Store(e)
     local list = ns.DB.chronicle
     local key = Key(e)
-    for _, old in ipairs(list) do if Key(old) == key then return false end end
+    local keys = Index()
+    if keys[key] then return false end
+    keys[key] = true
+    indexedCount = indexedCount + 1
     local at = #list + 1
     while at > 1 and list[at - 1].t > e.t do at = at - 1 end
     table.insert(list, at, e)

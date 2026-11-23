@@ -1,8 +1,7 @@
 -- Fellowship page: everyone you have grouped with.
 
 local _, ns = ...
-local U, S, K = ns.U, ns.Skin, ns.PageKit
-local C = S.colours
+local U, K = ns.U, ns.PageKit
 local Count, Plural, Short, ClassColour = U.Count, U.Plural, U.Short, U.ClassColour
 local Empty = K.Empty
 

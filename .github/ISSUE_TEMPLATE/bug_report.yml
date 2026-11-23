@@ -1,0 +1,40 @@
+name: Bug report
+description: Something in Forever Told isn't working
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! The quickest way to help: in game type `/told bug`, press Ctrl+C,
+        and paste it below. It has your version, client, memory use and any errors Forever Told
+        has written down, so there's no need to copy red error text by hand.
+  - type: input
+    id: version
+    attributes:
+      label: Forever Told version
+      description: "/told version, or the first line of /told bug. 1.3.0 for example."
+    validations:
+      required: true
+  - type: dropdown
+    id: client
+    attributes:
+      label: Game
+      options:
+        - WoW Forever
+        - Classic Era
+        - Classic Era Hardcore
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: report
+    attributes:
+      label: Bug report (optional)
+      description: Paste the text from /told bug here.
+      render: text

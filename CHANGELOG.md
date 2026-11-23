@@ -1,3 +1,30 @@
+## v1.3.0
+
+**New**
+- `/told bug` opens a bug report to copy and paste into an issue: your version, client, memory use, load times, the size of your saved data, how the guild channel is doing and every error in the log. The bug report form on GitHub asks for it.
+- `/told perf` is a profiler. `/told perf on` times everything Forever Told does (each event and guild message), `/told perf` lists the slowest, `/told perf off` stops it. Off, which is the default, it costs nothing.
+- `/told selftest` checks the game gives Forever Told what it needs, and names the feature that won't work if something is missing.
+- `/told new` lists what's new. After an update, one line in chat says so the first time you log in.
+- When a guildie runs a newer Forever Told, you're told once (test builds only count if you're on one too). `/told version` shows yours.
+- Forever Told has a page in the game's Options (Esc, Options, AddOns) with buttons for the journal, the settings and what's new.
+
+**Smoother**
+- A login burst of guild chronicle news no longer hitches the game. Each message checked itself against all 300 stored entries by rebuilding their names and links; now it's one look-up. The speed test's 200-message burst went from 52 ms to 6 ms.
+- With the window open, a burst of news, bounties or journal entries redraws the page once on the next frame, instead of once per message.
+- The window no longer does work every frame while it's open and idle: it only runs while fading in or when a redraw is waiting.
+- Guild messages the game holds back (it limits how many an addon sends per second) are sent again a moment later, instead of being dropped. `/told guild` and `/told bug` count how often that happens.
+
+**Error log**
+- Calls the game blocks ("Interface action failed because of an AddOn") are written to the error log too, not just Lua errors.
+- Errors not seen for two weeks clear themselves at login.
+
+**For developers**
+- Luacheck (`.luacheckrc`) checks every file for stray globals and unused code, with no warnings.
+- A speed test (`tests/speed.lua`) with a 5,000-entry journal, 300 grudges and 200-message login bursts fails if a page, a burst or the bug report gets slower than its limit.
+- GitHub Actions run luacheck, the tests on Lua 5.1 and LuaJIT, and the speed test on every push. Pushing a tag like `v1.3.0` builds `ForeverTold-v1.3.0.zip` and a GitHub release with notes from this changelog, after checking both TOCs carry the tag's version.
+- A bug report form, Dependabot for the Actions, and `docs/ARCHITECTURE.md`.
+- Tests now also check both TOCs match, the version has What's new notes and a changelog section, and cover everything above (67 tests).
+
 ## v1.2.0
 
 **New**
